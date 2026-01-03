@@ -1,0 +1,199 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Net.Http;
+using System.Threading.Tasks;
+using System.Web;
+using VoiceMaster.DataClasses;
+using VoiceMaster.Exceptions;
+using System.Reflection;
+using Dalamud.Game;
+using VoiceMaster.Helper.Data;
+using System.Net;
+using VoiceMaster.Helper.Functional;
+
+namespace VoiceMaster.Backend
+{
+    public class AlltalkBackend : ITTSBackend
+    {
+        public async Task<Stream> GenerateAudioStreamFromVoice(EKEventId eventId, VoiceMessage message, string voice, ClientLanguage language)
+        {
+            LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Generating Alltalk Audio", eventId);
+            var handler = new SocketsHttpHandler {
+                AutomaticDecompression = System.Net.DecompressionMethods.None, // keine gzip/br
+                KeepAlivePingPolicy = HttpKeepAlivePingPolicy.Always,          // optional .NET 7+
+                KeepAlivePingDelay = TimeSpan.FromSeconds(30),
+                KeepAlivePingTimeout = TimeSpan.FromSeconds(10)
+            };
+            using var httpClient = new HttpClient(handler);
+            httpClient.BaseAddress = new Uri(Plugin.Configuration.Alltalk.BaseUrl);
+            httpClient.Timeout = TimeSpan.FromSeconds(2);
+
+            HttpResponseMessage res = null;
+            try
+            {
+                var uriBuilder = new UriBuilder(Plugin.Configuration.Alltalk.BaseUrl);
+                uriBuilder.Path = Plugin.Configuration.Alltalk.StreamPath;
+                var query = HttpUtility.ParseQueryString(uriBuilder.Query);
+                query["text"] = message.Text;
+                query["voice"] = voice;
+                query["language"] = getAlltalkLanguage(language);
+                query["output_file"] = "ignoreme.wav";
+                uriBuilder.Query = query.ToString();
+                LogHelper.Debug(MethodBase.GetCurrentMethod().Name, $"Requesting... {uriBuilder.Uri}", eventId);
+                using var req = new HttpRequestMessage(HttpMethod.Get, uriBuilder.Uri);
+                req.Version = HttpVersion.Version11;
+                req.VersionPolicy = HttpVersionPolicy.RequestVersionExact;
+                req.Headers.TryAddWithoutValidation("Accept-Encoding", "identity");
+                req.Headers.TryAddWithoutValidation("Cache-Control", "no-transform");
+
+                res = await httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+                EnsureSuccessStatusCode(res);
+
+                // Copy the sound to a new buffer and enqueue it
+                LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Getting response...", eventId);
+                var responseStream = await res.Content.ReadAsStreamAsync().ConfigureAwait(false);
+                
+                // CRITICAL: Read the entire stream into memory BEFORE httpClient disposes
+                // Otherwise the stream gets closed when using block ends
+                var memoryStream = new MemoryStream();
+                await responseStream.CopyToAsync(memoryStream).ConfigureAwait(false);
+                memoryStream.Position = 0; // Reset to beginning for playback
+                
+                // Save to file if configured (for debugging/caching)
+                if (!Plugin.Configuration.Alltalk.StreamingGeneration)
+                {
+                    var filePath = Plugin.Configuration.LocalSaveLocation + @"\Temp.wav";
+                    memoryStream.Position = 0; // Reset before writing
+                    AudioFileHelper.WriteStreamToFile(eventId, filePath, memoryStream);
+                    memoryStream.Position = 0; // Reset again after writing
+                }
+
+                LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Done", eventId);
+                return memoryStream;
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Error(MethodBase.GetCurrentMethod().Name, ex.ToString(), eventId);
+            }
+
+            return null;
+        }
+
+        public List<string> GetAvailableVoices(EKEventId eventId)
+        {
+            LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Loading Alltalk Voices", eventId);
+            var mappedVoices = new List<string>();
+            try
+            {
+                HttpClient httpClient = new HttpClient();
+                httpClient.BaseAddress = new Uri(Plugin.Configuration.Alltalk.BaseUrl);
+                httpClient.Timeout = TimeSpan.FromSeconds(5);
+                var uriBuilder = new UriBuilder(Plugin.Configuration.Alltalk.BaseUrl) { Path = Plugin.Configuration.Alltalk.VoicesPath };
+                var result = httpClient.GetStringAsync(uriBuilder.Uri);
+                result.Wait();
+                string resultStr = result.Result.Replace("\\", "");
+                AlltalkVoices voices = System.Text.Json.JsonSerializer.Deserialize<AlltalkVoices>(resultStr);
+
+                foreach (string voice in voices.voices)
+                {
+                    mappedVoices.Add(voice);
+                }
+                LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Done", eventId);
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Error(MethodBase.GetCurrentMethod().Name, ex.ToString(), eventId);
+            }
+
+            return mappedVoices;
+        }
+
+        public async void StopGenerating(EKEventId eventId)
+        {
+            HttpClient httpClient = new HttpClient();
+            httpClient.BaseAddress = new Uri(Plugin.Configuration.Alltalk.BaseUrl);
+            httpClient.Timeout = TimeSpan.FromSeconds(5);
+            LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Stopping Alltalk Generation", eventId);
+            HttpResponseMessage res = null;
+            try
+            {
+                var content = new StringContent("");
+                res = await httpClient.PutAsync(Plugin.Configuration.Alltalk.StopPath, content).ConfigureAwait(false);
+            } catch (Exception ex)
+            {
+                LogHelper.Error(MethodBase.GetCurrentMethod().Name, ex.ToString(), eventId);
+            }
+        }
+
+        public async Task<string> CheckReady(EKEventId eventId)
+        {
+            HttpClient httpClient = new HttpClient();
+            httpClient.BaseAddress = new Uri(Plugin.Configuration.Alltalk.BaseUrl);
+            httpClient.Timeout = TimeSpan.FromSeconds(5);
+            LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Checking if Alltalk is ready", eventId);
+            try
+            {
+                var res = await httpClient.GetAsync(Plugin.Configuration.Alltalk.ReadyPath).ConfigureAwait(false);
+
+                var responseString = await res.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                LogHelper.Debug(MethodBase.GetCurrentMethod().Name, "Ready", eventId);
+                return responseString;
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Error(MethodBase.GetCurrentMethod().Name, ex.ToString(), eventId);
+            }
+
+            LogHelper.Debug(MethodBase.GetCurrentMethod().Name, "Not ready", eventId);
+            return "NotReady";
+        }
+
+        private static void EnsureSuccessStatusCode(HttpResponseMessage res)
+        {
+            if (!res.IsSuccessStatusCode)
+            {
+                throw new AlltalkFailedException(res.StatusCode, "Failed to make request.");
+            }
+        }
+
+        static string getAlltalkLanguage(ClientLanguage language)
+        {
+            switch (language)
+            {
+                case ClientLanguage.German:
+                    return "de";
+                case ClientLanguage.English:
+                    return "en";
+                case ClientLanguage.French:
+                    return "fr";
+                case ClientLanguage.Japanese:
+                    return "ja";
+            }
+
+            return "de";
+        }
+
+        public async Task<bool> ReloadService(string reloadModel, EKEventId eventId)
+        {
+            HttpClient httpClient = new HttpClient();
+            httpClient.BaseAddress = new Uri(Plugin.Configuration.Alltalk.BaseUrl);
+            httpClient.Timeout = TimeSpan.FromSeconds(5);
+            LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Reloading Alltalk Service", eventId);
+            HttpResponseMessage res = null;
+            try
+            {
+                var content = new StringContent("");
+                res = await httpClient.PostAsync(Plugin.Configuration.Alltalk.ReloadPath + reloadModel, content).ConfigureAwait(false);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Error(MethodBase.GetCurrentMethod().Name, ex.ToString(), eventId);
+            }
+
+            return false;
+        }
+    }
+}
