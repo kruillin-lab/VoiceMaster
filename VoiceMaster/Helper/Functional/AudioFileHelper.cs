@@ -5,14 +5,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using VoiceMaster;
 
 namespace VoiceMaster.Helper.Functional
 {
     public static class AudioFileHelper
     {
-        // Key = time added, Value = full file path on disk.
         public static Dictionary<DateTime, string> SavedFiles = new Dictionary<DateTime, string>();
-
         public static bool LoadLocalAudio(EKEventId eventId, string localSaveLocation, VoiceMessage voiceMessage)
         {
             try
@@ -22,28 +21,28 @@ namespace VoiceMaster.Helper.Functional
                 if (File.Exists(filePath))
                 {
                     voiceMessage.LoadedLocally = true;
-
-                    // IMPORTANT:
-                    // Do NOT wrap this in a using/using var.
-                    // The playback pipeline owns the stream lifetime and will dispose it after playback.
-                    var mainOutputStream = new WavFileReader(filePath);
-                    voiceMessage.Stream = mainOutputStream;
-
+                    if (Plugin.Configuration.UseMemoryPlayback)
+                    {
+                        var bytes = File.ReadAllBytes(filePath);
+                        voiceMessage.Stream = new MemoryStream(bytes, writable: false);
+                    }
+                    else
+                    {
+                        voiceMessage.Stream = new WavFileReader(filePath);
+                    }
                     PlayingHelper.PlayingQueue.Add(voiceMessage);
-
-                    LogHelper.Debug(MethodBase.GetCurrentMethod().Name,
-                        $"Local file found. Location: {filePath}", eventId);
+                    LogHelper.Debug(MethodBase.GetCurrentMethod().Name, $"Local file found. Location: {filePath}", eventId);
 
                     return true;
                 }
-
-                LogHelper.Debug(MethodBase.GetCurrentMethod().Name,
-                    $"No local file found. Location searched: {filePath}", eventId);
+                else
+                {
+                    LogHelper.Debug(MethodBase.GetCurrentMethod().Name, $"No local file found. Location searched: {filePath}", eventId);
+                }
             }
             catch (Exception ex)
             {
-                LogHelper.Error(MethodBase.GetCurrentMethod().Name,
-                    $"Error while loading local audio: {ex}", eventId);
+                LogHelper.Error(MethodBase.GetCurrentMethod().Name, $"Error while loading local audio: {ex}", eventId);
             }
 
             return false;
@@ -51,67 +50,49 @@ namespace VoiceMaster.Helper.Functional
 
         public static string GetLocalAudioPath(string localSaveLocation, VoiceMessage voiceMessage)
         {
-            var speakerName = voiceMessage?.Speaker?.Name ?? "Unknown";
-            var speakerFolder = GetSpeakerAudioPath(localSaveLocation, speakerName);
-            var fileName = VoiceMessageToFileName(voiceMessage?.Text ?? string.Empty);
+            var filePath = GetSpeakerAudioPath(localSaveLocation, voiceMessage.Speaker.Name) + $"{voiceMessage.Speaker.Race.ToString()}-{voiceMessage.Speaker.Voice?.VoiceName}\\{VoiceMessageToFileName(voiceMessage.Text)}.wav";
 
-            return Path.Combine(speakerFolder, fileName);
+            return filePath;
         }
 
         public static string GetSpeakerAudioPath(string localSaveLocation, string speaker)
         {
-            // Keep the folder name file-system safe.
-            var safeSpeaker = string.Join("_", (speaker ?? "Unknown")
-                .Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries))
-                .Trim();
+            var filePath = localSaveLocation;
+            if (!filePath.EndsWith(@"\"))
+                filePath += @"\";
 
-            return Path.Combine(localSaveLocation, safeSpeaker);
+            speaker = speaker != "" ? speaker : "NOPERSON";
+            filePath += $"{speaker}\\";
+
+            return filePath;
         }
 
         public static string VoiceMessageToFileName(string voiceMessage)
         {
-            // Keep the filename file-system safe and reasonably bounded.
-            var safe = string.Join("_", (voiceMessage ?? string.Empty)
-                .Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries))
-                .Trim();
+            var fileName = voiceMessage;
+            var temp = fileName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries);
+            fileName = string.Join("", temp).ToLower().Replace(" ", "").Replace(".", "").Replace("!", "").Replace(",", "").Replace("-", "").Replace("_", "");
+            if (fileName.Length > 120)
+                fileName = fileName.Substring(0, 120);
 
-            if (string.IsNullOrWhiteSpace(safe))
-                safe = "Empty";
-
-            // Avoid insane path lengths.
-            const int max = 160;
-            if (safe.Length > max)
-                safe = safe.Substring(0, max);
-
-            return safe + ".wav";
+            return fileName;
         }
 
         public static bool WriteStreamToFile(EKEventId eventId, string filePath, Stream stream)
         {
+            LogHelper.Debug(MethodBase.GetCurrentMethod().Name, $"Saving audio locally: {filePath}", eventId);
             try
             {
-                LogHelper.Debug(MethodBase.GetCurrentMethod().Name, $"Saving audio locally: {filePath}", eventId);
-
-                Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
-
-                if (stream.CanSeek)
-                    stream.Seek(0, SeekOrigin.Begin);
-
-                // IMPORTANT:
-                // CreateWaveFileAsync writes the WAV header and then copies PCM bytes.
-                // If we fire-and-forget this Task, playback may open the file before it is finished,
-                // which can cause empty/partial reads and a BASS push-stream "Ended" failure.
-                RawPcmToWav.CreateWaveFileAsync(filePath, stream, sampleRate: 24000, bitsPerSample: 16, channels: 1)
-                    .GetAwaiter().GetResult();
-
-                SavedFiles[DateTime.Now] = filePath;
+                Directory.CreateDirectory(Path.GetDirectoryName(filePath));
+                stream.Seek(0, SeekOrigin.Begin);
+                RawPcmToWav.CreateWaveFileAsync(filePath, stream, sampleRate: 24000, bitsPerSample: 16, channels: 1);
+                SavedFiles.Add(DateTime.Now, filePath);
 
                 return true;
             }
             catch (Exception ex)
             {
-                LogHelper.Error(MethodBase.GetCurrentMethod().Name,
-                    $"Error while saving audio locally: {ex}", eventId);
+                LogHelper.Error(MethodBase.GetCurrentMethod().Name, $"Error while saving audio locally: {ex.ToString()}", eventId);
             }
 
             return false;
@@ -119,98 +100,89 @@ namespace VoiceMaster.Helper.Functional
 
         public static int DeleteLastNFiles(int nFilesToDelete = 10)
         {
-            try
+            var timeStamps = SavedFiles.Keys.ToList();
+            timeStamps.Sort((a, b) => DateTime.Compare(b, a));
+            var file = "";
+            var deletedFiles = 0;
+
+            for (int i = 0; i < nFilesToDelete; i++)
             {
-                if (SavedFiles.Count == 0) return 0;
-
-                int deleted = 0;
-
-                foreach (var kv in SavedFiles.OrderByDescending(k => k.Key).Take(nFilesToDelete).ToList())
+                if (SavedFiles.Count > 0)
                 {
-                    var file = kv.Value;
                     try
                     {
-                        if (File.Exists(file))
-                        {
-                            File.Delete(file);
-                            deleted++;
-                        }
+                        file = SavedFiles[timeStamps[0]];
+                        File.Delete(file);
+                        deletedFiles++;
+                        LogHelper.Info(MethodBase.GetCurrentMethod().Name, $"Deleted local saved file: {file}", new EKEventId(0, Enums.TextSource.None));
                     }
-                    catch
+                    catch (FileNotFoundException ex)
+                    { }
+                    catch (Exception ex)
                     {
-                        // Ignore per-file failures; continue cleanup.
+                        LogHelper.Error(MethodBase.GetCurrentMethod().Name, $"Error while deleting local saved file: {file} - {ex.ToString()}", new EKEventId(0, Enums.TextSource.None));
                     }
-                    finally
-                    {
-                        SavedFiles.Remove(kv.Key);
-                    }
+                    SavedFiles.Remove(timeStamps[0]);
+                    timeStamps.RemoveAt(0);
                 }
+                else
+                    break;
+            }
 
-                return deleted;
-            }
-            catch
-            {
-                return 0;
-            }
+            return deletedFiles;
         }
 
         public static int DeleteLastNMinutesFiles(int nMinutesFilesToDelete = 10)
         {
-            try
+            var timeStamps = SavedFiles.Keys.ToList().FindAll(p => p >= DateTime.Now.AddMinutes(-nMinutesFilesToDelete));
+            var file = "";
+            var deletedFiles = 0;
+
+            foreach (var timeStamp in timeStamps)
             {
-                if (SavedFiles.Count == 0) return 0;
-
-                var cutoff = DateTime.Now.AddMinutes(-Math.Abs(nMinutesFilesToDelete));
-                int deleted = 0;
-
-                foreach (var kv in SavedFiles.Where(k => k.Key >= cutoff).OrderByDescending(k => k.Key).ToList())
+                if (SavedFiles.Count > 0)
                 {
-                    var file = kv.Value;
                     try
                     {
-                        if (File.Exists(file))
-                        {
-                            File.Delete(file);
-                            deleted++;
-                        }
-                    }
-                    catch
-                    {
-                        // Ignore per-file failures; continue cleanup.
-                    }
-                    finally
-                    {
-                        SavedFiles.Remove(kv.Key);
-                    }
-                }
+                        file = SavedFiles[timeStamp];
+                        File.Delete(file);
+                        deletedFiles++;
+                        LogHelper.Info(MethodBase.GetCurrentMethod().Name, $"Deleted local saved file: {file}", new EKEventId(0, Enums.TextSource.None));
 
-                return deleted;
+                    }
+                    catch (FileNotFoundException ex)
+                    { }
+                    catch (Exception ex)
+                    {
+                        LogHelper.Error(MethodBase.GetCurrentMethod().Name, $"Error while deleting local saved file: {file} - {ex.ToString()}", new EKEventId(0, Enums.TextSource.None));
+                    }
+                    SavedFiles.Remove(timeStamp);
+                }
+                else
+                    break;
             }
-            catch
-            {
-                return 0;
-            }
+
+            return deletedFiles;
         }
 
         public static bool RemoveSavedNpcFiles(string localSaveLocation, string speaker)
         {
-            try
-            {
-                var speakerFolderPath = GetSpeakerAudioPath(localSaveLocation, speaker);
+            var speakerFolderPath = GetSpeakerAudioPath(localSaveLocation, speaker);
 
-                if (!Directory.Exists(speakerFolderPath))
+            if (Directory.Exists(speakerFolderPath))
+            {
+                try
+                {
+                    Directory.Delete(speakerFolderPath, true);
                     return true;
+                }
+                catch (Exception ex)
+                {
+                    LogHelper.Error(MethodBase.GetCurrentMethod().Name, $"Error while deleting local saves for: {speaker} - {ex.ToString()}", new EKEventId(0, Enums.TextSource.None));
+                }
+            }
 
-                Directory.Delete(speakerFolderPath, true);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                LogHelper.Error(MethodBase.GetCurrentMethod().Name,
-                    $"Failed to remove saved NPC files for speaker '{speaker}': {ex}",
-                    new EKEventId(0, Enums.TextSource.None));
-                return false;
-            }
+            return false;
         }
     }
 }

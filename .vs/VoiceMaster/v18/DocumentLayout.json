@@ -18,7 +18,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 4,
+          "SelectedChildIndex": 5,
           "Children": [
             {
               "$type": "Bookmark",
@@ -37,6 +37,10 @@
               "Name": "ST:129:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
             },
             {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c64b9c2-e352-428e-a56d-0ace190b99a6}"
+            },
+            {
               "$type": "Document",
               "DocumentIndex": 0,
               "Title": "AlltalkBackend.cs",
@@ -44,7 +48,7 @@
               "RelativeDocumentMoniker": "VoiceMaster\\Backends\\AlltalkBackend.cs",
               "ToolTip": "C:\\Users\\kruil\\Documents\\Projects\\output\\VoiceMaster\\Backends\\AlltalkBackend.cs",
               "RelativeToolTip": "VoiceMaster\\Backends\\AlltalkBackend.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA0AAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-01-03T18:59:19.828Z",
               "EditorCaption": ""
@@ -58,8 +62,7 @@
               "ToolTip": "C:\\Users\\kruil\\Documents\\Projects\\output\\VoiceMaster\\VoiceMaster.csproj",
               "RelativeToolTip": "VoiceMaster\\VoiceMaster.csproj",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
-              "WhenOpened": "2026-01-03T18:22:08.496Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-01-03T18:22:08.496Z"
             },
             {
               "$type": "Bookmark",

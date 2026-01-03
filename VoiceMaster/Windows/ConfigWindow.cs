@@ -541,6 +541,14 @@ public class ConfigWindow : Window, IDisposable
             Plugin.Configuration.LoadFromLocalFirst = loadLocalFirst;
             Plugin.Configuration.Save();
         }
+
+        var useMemoryPlayback = Plugin.Configuration.UseMemoryPlayback;
+        if (ImGui.Checkbox("Use memory playback for local audio (recommended)", ref useMemoryPlayback))
+        {
+            Plugin.Configuration.UseMemoryPlayback = useMemoryPlayback;
+            Plugin.Configuration.Save();
+        }
+
         var saveLocally = Plugin.Configuration.SaveToLocal;
         if (ImGui.Checkbox("Save generated audio locally", ref saveLocally))
         {
