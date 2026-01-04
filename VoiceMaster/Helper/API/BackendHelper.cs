@@ -71,6 +71,19 @@ namespace VoiceMaster.Helper.API
             LogHelper.Info(MethodBase.GetCurrentMethod().Name, $"Starting voice inference: {voiceMessage.Language}", eventId);
             LogHelper.Info(MethodBase.GetCurrentMethod().Name, voiceMessage.Text.ToString(), eventId);
 
+            // Optional: suppress NPCs that are already voiced by the game (user-maintained ignore list)
+            // Applies only to NPC-facing sources (not chat/bubble).
+            if (voiceMessage.Source is TextSource.AddonTalk or TextSource.AddonBattleTalk
+                or TextSource.AddonSelectString or TextSource.AddonCutsceneSelectString)
+            {
+                var speakerName = voiceMessage.Speaker?.Name;
+                if (Plugin.ShouldIgnoreNpcSpeaker(speakerName))
+                {
+                    LogHelper.Info(MethodBase.GetCurrentMethod().Name, $"Ignored voiced NPC: {speakerName}", eventId);
+                    return;
+                }
+            }
+
             switch (voiceMessage.Source)
             {
                 case TextSource.Chat:

@@ -339,26 +339,47 @@ public sealed class Live3DAudioEngine : IDisposable
             if (Bass.ChannelSetSync(_h, SyncFlags.End, 0, _endSync) == 0)
                 throw new InvalidOperationException($"ChannelSetSync(End) failed: {Bass.LastError}");
 
+            // IMPORTANT: Prime the push-stream with a little silence BEFORE starting the writer.
+            // If the source stream is already fully buffered (non-streaming generation), the writer
+            // can finish and signal StreamProcedureType.End extremely quickly. If that happens
+            // before we push the priming silence, ManagedBass will return BASS_ERROR_ENDED.
+            // Priming first avoids the race entirely.
+            PrimePushStreamSilence();
+
             _reader = Task.Run(ReadLoop, _cts.Token);
             _writer = Task.Run(WriteLoop, _cts.Token);
 
             _lastPos = _srcPos;
             _smoothPos = _srcPos;
             _lastTicks = Stopwatch.GetTimestamp();
-            PrebufferAndStartWithFadeIn();
+            PrebufferAndStartWithFadeIn(skipPrimingSilence: true);
             SetState(PlaybackState.Playing);
         }
 
-        void PrebufferAndStartWithFadeIn()
+        void PrimePushStreamSilence()
         {
             int frameOut = _bytesPerSampleOut * _ch;
 
-            // 1) Priming-Silence (~90 ms)
-            int silenceMs    = 90;
+            // Priming silence helps eliminate start-up crackle and stabilizes the push stream.
+            // NOTE: We keep these values intentionally a bit conservative for chat lines.
+            int silenceMs = 90;
             int silenceBytes = Math.Max(frameOut, _sr * frameOut * silenceMs / 1000);
             PushSilence(silenceBytes);
+        }
 
-            // 2) Auf ausreichend Material warten (>= 650 ms)
+        void PrebufferAndStartWithFadeIn(bool skipPrimingSilence)
+        {
+            int frameOut = _bytesPerSampleOut * _ch;
+
+            if (!skipPrimingSilence)
+            {
+                // Fallback path (should normally be skipped because we prime in Start()).
+                int silenceMs = 90;
+                int silenceBytes = Math.Max(frameOut, _sr * frameOut * silenceMs / 1000);
+                PushSilence(silenceBytes);
+            }
+
+            // 2) Auf ausreichend Material warten (>= 320 ms)
             int targetMs   = 650;
             int targetByte = Math.Max(frameOut, _sr * frameOut * targetMs / 1000);
 
@@ -374,7 +395,7 @@ public sealed class Live3DAudioEngine : IDisposable
             if (!Bass.ChannelPlay(_h, false))
                 throw new InvalidOperationException($"ChannelPlay failed: {Bass.LastError}");
 
-            // 4) Mehr-Chunk-Fade-In im DSP (z. B. 120 ms)
+            // 4) Mehr-Chunk-Fade-In im DSP (z. B. 40 ms)
             int rampMs = 120;
             _rampTotalSamples = Math.Max(1, _sr * rampMs / 1000 * _ch);
             _rampSamplesLeft  = _rampTotalSamples;

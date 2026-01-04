@@ -77,7 +77,7 @@ public class FirstTimeWindow : Window, IDisposable
             {
                 ImGui.Text(
                     "Pressing this button will close the install window and enable you to fully use & configure VoiceMaster.");
-                ImGui.Text("Use /ek in chat to open the full configuration window.");
+                ImGui.Text("Use /vm in chat to open the full configuration window.");
 
                 using (ImRaii.Disabled(!(Plugin.Configuration.Alltalk.RemoteInstance || (Plugin.Configuration.Alltalk.LocalInstance && Plugin.Configuration.Alltalk.LocalInstall))))
                 {

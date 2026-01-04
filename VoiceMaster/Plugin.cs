@@ -4,10 +4,12 @@ using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
 using VoiceMaster.Windows;
 using Dalamud.Game;
+using Dalamud.Game.ClientState.Conditions;
 using VoiceMaster.Enums;
 using System;
 using VoiceMaster.DataClasses;
 using System.Linq;
+using System.Collections.Generic;
 using Dalamud.Game.Text.SeStringHandling;
 using GameObject = Dalamud.Game.ClientState.Objects.Types.IGameObject;
 using System.Reflection;
@@ -44,6 +46,70 @@ public partial class Plugin : IDalamudPlugin
     internal static ConfigWindow ConfigWindow { get; private set; } = null!;
     internal static AlltalkInstanceWindow AlltalkInstanceWindow { get; private set; } = null!;
     internal static FirstTimeWindow FirstTimeWindow { get; private set; } = null!;
+
+    // Runtime ignore sets (not persisted unless added to Configuration.IgnoredNpcAlways)
+    internal static readonly HashSet<string> IgnoredNpcSession = new(StringComparer.OrdinalIgnoreCase);
+    internal static readonly HashSet<string> IgnoredNpcInstance = new(StringComparer.OrdinalIgnoreCase);
+
+    internal static string NormalizeSpeakerKey(string? name)
+        => (name ?? string.Empty).Trim();
+
+    internal static void ClearInstanceIgnoresIfNotInDuty()
+    {
+        // Instance ignores only make sense while "BoundByDuty" is true.
+        if (!Condition[ConditionFlag.BoundByDuty] && IgnoredNpcInstance.Count > 0)
+            IgnoredNpcInstance.Clear();
+    }
+
+    internal static bool ShouldIgnoreNpcSpeaker(string? speakerName)
+    {
+        ClearInstanceIgnoresIfNotInDuty();
+        var key = NormalizeSpeakerKey(speakerName);
+        if (string.IsNullOrWhiteSpace(key))
+            return false;
+
+        if (IgnoredNpcInstance.Contains(key))
+            return true;
+        if (IgnoredNpcSession.Contains(key))
+            return true;
+
+        // Persisted ignores
+        var always = Configuration.IgnoredNpcAlways;
+        return always != null && always.Any(x => x.Equals(key, StringComparison.OrdinalIgnoreCase));
+    }
+
+    internal static void AddIgnoredNpc(string speakerName, int scope)
+    {
+        var key = NormalizeSpeakerKey(speakerName);
+        if (string.IsNullOrWhiteSpace(key))
+            return;
+
+        // 0 instance, 1 session, 2 always
+        if (scope <= 0)
+            IgnoredNpcInstance.Add(key);
+        else if (scope == 1)
+            IgnoredNpcSession.Add(key);
+        else
+        {
+            if (!Configuration.IgnoredNpcAlways.Any(x => x.Equals(key, StringComparison.OrdinalIgnoreCase)))
+                Configuration.IgnoredNpcAlways.Add(key);
+            Configuration.Save();
+        }
+    }
+
+    internal static void RemoveIgnoredNpcEverywhere(string speakerName)
+    {
+        var key = NormalizeSpeakerKey(speakerName);
+        if (string.IsNullOrWhiteSpace(key))
+            return;
+
+        IgnoredNpcInstance.Remove(key);
+        IgnoredNpcSession.Remove(key);
+
+        if (Configuration.IgnoredNpcAlways.RemoveAll(x => x.Equals(key, StringComparison.OrdinalIgnoreCase)) > 0)
+            Configuration.Save();
+    }
+
     internal static DialogExtraOptionsWindow DialogExtraOptionsWindow { get; private set; } = null!;
 
     internal static LipSyncHelper LipSyncHelper{ get; private set; } = null!;

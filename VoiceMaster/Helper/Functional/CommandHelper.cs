@@ -53,6 +53,20 @@ namespace VoiceMaster.Helper.Functional
             {
                 HelpMessage = "Toggles choice voicing"
             });
+
+            Plugin.CommandManager.AddHandler("/vmignore", new CommandInfo(CommandHelper.OnCommand)
+            {
+                HelpMessage = "Ignores the current target NPC for voiced overlap. Usage: /vmignore [instance|session|always]"
+            });
+            Plugin.CommandManager.AddHandler("/vmunignore", new CommandInfo(CommandHelper.OnCommand)
+            {
+                HelpMessage = "Removes current target NPC from ignore list(s). Usage: /vmunignore"
+            });
+            Plugin.CommandManager.AddHandler("/vmlistignore", new CommandInfo(CommandHelper.OnCommand)
+            {
+                HelpMessage = "Prints ignored NPCs (instance/session/always)."
+            });
+
             Plugin.CommandManager.AddHandler("/ek", new CommandInfo(CommandHelper.OnCommand)
             {
                 HelpMessage = "Opens the Plugin.Configuration window"
@@ -87,6 +101,15 @@ namespace VoiceMaster.Helper.Functional
             var errorText = "";
             switch (command)
             {
+                case "/vmignore":
+                    IgnoreCurrentTarget(args);
+                    break;
+                case "/vmunignore":
+                    UnignoreCurrentTarget();
+                    break;
+                case "/vmlistignore":
+                    PrintIgnoreLists();
+                    break;
                 case "/ek":
                     if (!Plugin.Configuration.FirstTime)
                         ToggleConfigUi();
@@ -212,7 +235,99 @@ namespace VoiceMaster.Helper.Functional
             }
         }
         
-        public static void PrintDebugInfo()
+        
+        private static string? GetCurrentTargetName()
+        {
+            try
+            {
+                var lp = DalamudHelper.LocalPlayer;
+                var target = lp?.TargetObject;
+                var name = target?.Name.TextValue;
+                if (!string.IsNullOrWhiteSpace(name))
+                    return name;
+                return target?.Name.ToString();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static void IgnoreCurrentTarget(string args)
+        {
+            var targetName = GetCurrentTargetName();
+            if (string.IsNullOrWhiteSpace(targetName))
+            {
+                PrintText("Ignore", "No target selected.");
+                return;
+            }
+
+            var scope = ParseIgnoreScope(args);
+            Plugin.AddIgnoredNpc(targetName, scope);
+            var scopeText = scope switch { 0 => "instance", 1 => "session", 2 => "always", _ => "instance" };
+            PrintText("Ignore", $"Ignoring \"{targetName}\" ({scopeText}).");
+        }
+
+        private static void UnignoreCurrentTarget()
+        {
+            var targetName = GetCurrentTargetName();
+            if (string.IsNullOrWhiteSpace(targetName))
+            {
+                PrintText("Ignore", "No target selected.");
+                return;
+            }
+
+            Plugin.RemoveIgnoredNpcEverywhere(targetName);
+            PrintText("Ignore", $"Unignored \"{targetName}\".");
+        }
+
+        private static int ParseIgnoreScope(string args)
+        {
+            var a = (args ?? string.Empty).Trim().ToLowerInvariant();
+            if (string.IsNullOrEmpty(a))
+                return 0;
+
+            if (a.StartsWith("inst"))
+                return 0;
+            if (a.StartsWith("sess"))
+                return 1;
+            if (a.StartsWith("alwa") || a.StartsWith("perm") || a.StartsWith("forev"))
+                return 2;
+
+            // Also allow numeric scopes: 0/1/2
+            if (int.TryParse(a, out var n) && n is >= 0 and <= 2)
+                return n;
+
+            return 0;
+        }
+
+        private static void PrintIgnoreLists()
+        {
+            try
+            {
+                // Instance + Session are runtime sets
+                var inst = Plugin.IgnoredNpcInstance.Count;
+                var sess = Plugin.IgnoredNpcSession.Count;
+                var always = Plugin.Configuration.IgnoredNpcAlways.Count;
+
+                PrintText("Ignore", $"Ignored NPCs -> Instance: {inst}, Session: {sess}, Always: {always}");
+
+                if (inst > 0)
+                    PrintText("Ignore", "Instance -> " + string.Join(", ", Plugin.IgnoredNpcInstance));
+
+                if (sess > 0)
+                    PrintText("Ignore", "Session -> " + string.Join(", ", Plugin.IgnoredNpcSession));
+
+                if (always > 0)
+                    PrintText("Ignore", "Always -> " + string.Join(", ", Plugin.Configuration.IgnoredNpcAlways));
+            }
+            catch (Exception ex)
+            {
+                PrintText("Ignore", $"Error listing ignores: {ex.Message}");
+            }
+        }
+
+public static void PrintDebugInfo()
         {
             var cond1 = Plugin.Condition[ConditionFlag.OccupiedInQuestEvent];
             var cond2 = Plugin.Condition[ConditionFlag.Occupied];
@@ -254,6 +369,9 @@ namespace VoiceMaster.Helper.Functional
             Plugin.CommandManager.RemoveHandler("/vmbubble");
             Plugin.CommandManager.RemoveHandler("/vmcutschoice");
             Plugin.CommandManager.RemoveHandler("/vmchoice");
+            Plugin.CommandManager.RemoveHandler("/vmignore");
+            Plugin.CommandManager.RemoveHandler("/vmunignore");
+            Plugin.CommandManager.RemoveHandler("/vmlistignore");
             Plugin.CommandManager.RemoveHandler("/ekdel");
             Plugin.CommandManager.RemoveHandler("/ekdelmin");
         }

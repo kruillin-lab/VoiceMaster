@@ -36,7 +36,6 @@ public class Configuration : IPluginConfiguration
     public LogConfig logConfig { get; set; } = new LogConfig();
     public bool SaveToLocal { get; set; } = false;
     public bool LoadFromLocalFirst { get; set; } = false;
-    public bool UseMemoryPlayback { get; set; } = false;
     public string LocalSaveLocation { get; set; } = @"C:\alltalk_tts\LocalSaves";
     public bool CreateMissingLocalSaveLocation { get; set; } = false;
     public bool VoiceRetainers { get; set; } = false;
@@ -60,6 +59,14 @@ public class Configuration : IPluginConfiguration
     public bool VoiceChatShout { get; set; } = false;
     public bool VoiceChatFreeCompany { get; set; } = false;
     public List<PhoneticCorrection> PhoneticCorrections { get; set; } = new List<PhoneticCorrection>();
+
+
+    // Voiced dialogue suppression / ignore list
+    // 0 = This instance (duty), 1 = This session, 2 = Always (persisted)
+    public int IgnoreNpcDefaultScope { get; set; } = 0;
+
+    // Lowercased speaker keys (typically NPC names) that should always be ignored
+    public List<string> IgnoredNpcAlways { get; set; } = new();
 
     // the below exist just to make saving less cumbersome
     [NonSerialized]

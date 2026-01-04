@@ -43,6 +43,13 @@ public class ConfigWindow : Window, IDisposable
     private string filterRacePlayers = "";
     private string filterNamePlayers = "";
     private string filterVoicePlayers = "";
+
+    // Manual player add (UI fields)
+    private string _manualPlayerName = string.Empty;
+    private int _manualPlayerGenderIndex = 0;
+    private int _manualPlayerRaceIndex = 0;
+    private int _manualPlayerVoiceIndex = 0;
+
     private List<NpcMapData> filteredBubbles = [];
     public static bool UpdateDataBubbles { get; set; }
     private bool resetDataBubbles;
@@ -541,14 +548,6 @@ public class ConfigWindow : Window, IDisposable
             Plugin.Configuration.LoadFromLocalFirst = loadLocalFirst;
             Plugin.Configuration.Save();
         }
-
-        var useMemoryPlayback = Plugin.Configuration.UseMemoryPlayback;
-        if (ImGui.Checkbox("Use memory playback for local audio (recommended)", ref useMemoryPlayback))
-        {
-            Plugin.Configuration.UseMemoryPlayback = useMemoryPlayback;
-            Plugin.Configuration.Save();
-        }
-
         var saveLocally = Plugin.Configuration.SaveToLocal;
         if (ImGui.Checkbox("Save generated audio locally", ref saveLocally))
         {
@@ -803,6 +802,73 @@ public class ConfigWindow : Window, IDisposable
                 {
                     if (tabItemPlayers)
                     {
+                        ImGui.Separator();
+                        ImGui.TextUnformatted("Manual Add Player");
+                        ImGui.Separator();
+
+                        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+                        ImGui.InputText("##VMManualPlayerName", ref _manualPlayerName, 64);
+
+                        // Gender / Race
+                        var gIdx = _manualPlayerGenderIndex;
+                        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+                        if (ImGui.Combo("##VMManualPlayerGender", ref gIdx, Constants.GENDERNAMESLIST, Constants.GENDERNAMESLIST.Length))
+                            _manualPlayerGenderIndex = gIdx;
+
+                        var rIdx = _manualPlayerRaceIndex;
+                        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+                        if (ImGui.Combo("##VMManualPlayerRace", ref rIdx, Constants.RACENAMESLIST, Constants.RACENAMESLIST.Length))
+                            _manualPlayerRaceIndex = rIdx;
+
+                        // Voice dropdown
+                        var voicesForDropdown = Plugin.Configuration!.VoiceMasterVoices.Where(v => v.IsEnabled).ToList();
+                        var voiceNames = voicesForDropdown.ConvertAll(v => v.VoiceNameNote).ToArray();
+                        if (voiceNames.Length == 0)
+                            voiceNames = new[] { "No voices loaded" };
+
+                        var vIdx = _manualPlayerVoiceIndex;
+                        if (vIdx < 0) vIdx = 0;
+                        if (vIdx >= voiceNames.Length) vIdx = 0;
+
+                        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+                        if (ImGui.Combo("##VMManualPlayerVoice", ref vIdx, voiceNames, voiceNames.Length))
+                            _manualPlayerVoiceIndex = vIdx;
+
+                        if (ImGui.Button("Add Player"))
+                        {
+                            var name = (_manualPlayerName ?? string.Empty).Trim();
+                            if (!string.IsNullOrWhiteSpace(name))
+                            {
+                                var exists = Plugin.Configuration.MappedPlayers.Any(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+                                if (!exists)
+                                {
+                                    var data = new NpcMapData(Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player)
+                                    {
+                                        Name = name,
+                                        Gender = Constants.GENDERLIST[Math.Clamp(_manualPlayerGenderIndex, 0, Constants.GENDERLIST.Count - 1)],
+                                        Race = Constants.RACELIST[Math.Clamp(_manualPlayerRaceIndex, 0, Constants.RACELIST.Count - 1)],
+                                        RaceStr = string.Empty,
+                                        IsChild = false,
+                                        IsEnabled = true,
+                                        IsEnabledBubble = true,
+                                    };
+
+                                    if (voicesForDropdown.Count > 0)
+                                    {
+                                        var chosen = voicesForDropdown[Math.Clamp(_manualPlayerVoiceIndex, 0, voicesForDropdown.Count - 1)];
+                                        data.voice = chosen.BackendVoice ?? string.Empty;
+                                    }
+
+                                    data.RefreshSelectable();
+                                    Plugin.Configuration.MappedPlayers.Add(data);
+                                    Plugin.Configuration.Save();
+                                    _manualPlayerName = string.Empty;
+                                    UpdateDataPlayers = true;
+                                }
+                            }
+                        }
+
+                        ImGui.Separator();
                         DrawVoiceSelectionTable("Players", Plugin.Configuration!.MappedPlayers, ref filteredPlayers,
                                                 ref _updateDataNpcs, ref resetDataPlayers, ref filterGenderPlayers,
                                                 ref filterRacePlayers, ref filterNamePlayers, ref filterVoicePlayers);
