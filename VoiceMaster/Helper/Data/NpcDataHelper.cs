@@ -230,6 +230,51 @@ namespace VoiceMaster.Helper.Data
             NpcMapData? result = null;
             var datas = GetCharacterMapDatas(eventId);
 
+            // ---- Stable player mapping (Option B) ----
+            // Player names can vary by context ("You", cutscene proxies, cross-world formatting, etc.).
+            // For ObjectKind.Player, use ContentId as the primary key when available.
+            if (data.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player && data.ContentId != 0)
+            {
+                // First, try to find an existing mapping by ContentId.
+                var existingByContentId = datas.Find(p => p.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player && p.ContentId == data.ContentId && p.ContentId != 0);
+                if (existingByContentId != null)
+                {
+                    // Keep the existing mapping, but refresh basic identity fields in case they were unknown.
+                    if (!string.IsNullOrWhiteSpace(data.Name) && !data.Name.Equals(existingByContentId.Name, StringComparison.OrdinalIgnoreCase))
+                        existingByContentId.Name = data.Name;
+                    if (data.Race != NpcRaces.Unknown && existingByContentId.Race == NpcRaces.Unknown)
+                        existingByContentId.Race = data.Race;
+                    if (!string.IsNullOrWhiteSpace(data.RaceStr) && string.IsNullOrWhiteSpace(existingByContentId.RaceStr))
+                        existingByContentId.RaceStr = data.RaceStr;
+                    if (data.Gender != 0 && existingByContentId.Gender == 0)
+                        existingByContentId.Gender = data.Gender;
+
+                    return existingByContentId;
+                }
+
+                // Otherwise, attempt a one-time migration from legacy player mappings that predate ContentId.
+                // If we find a matching legacy player entry by name (best-effort), we attach the ContentId to it.
+                var legacyByName = datas.Find(p => p.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player
+                                                   && p.ContentId == 0
+                                                   && !string.IsNullOrWhiteSpace(p.Name)
+                                                   && !string.IsNullOrWhiteSpace(data.Name)
+                                                   && p.Name.Equals(data.Name, StringComparison.OrdinalIgnoreCase));
+                if (legacyByName != null)
+                {
+                    legacyByName.ContentId = data.ContentId;
+                    if (data.Race != NpcRaces.Unknown)
+                        legacyByName.Race = data.Race;
+                    if (!string.IsNullOrWhiteSpace(data.RaceStr))
+                        legacyByName.RaceStr = data.RaceStr;
+                    if (data.Gender != 0)
+                        legacyByName.Gender = data.Gender;
+                    if (!string.IsNullOrWhiteSpace(data.Name))
+                        legacyByName.Name = data.Name;
+
+                    return legacyByName;
+                }
+            }
+
             if (data.Race == NpcRaces.Unknown)
             {
                 var oldResult = datas.Find(p => p.ToString() == data.ToString());

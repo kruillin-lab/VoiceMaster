@@ -15,7 +15,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyDescriptionAttribute("A TTS Dalamud Plugin that breaks the silence! For self hosted TTS Services.")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("0.15.0.1")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.15.0.1+bb167b86d6af4d2cafd5d6b5e1d492120997c02e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.15.0.1+ee48441ed1b433abb076005bb91be20a8a01d3a2")]
 [assembly: System.Reflection.AssemblyProductAttribute("VoiceMaster")]
 [assembly: System.Reflection.AssemblyTitleAttribute("VoiceMaster")]
 [assembly: System.Reflection.AssemblyVersionAttribute("0.15.0.1")]

@@ -4,12 +4,11 @@ using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
 using VoiceMaster.Windows;
 using Dalamud.Game;
-using Dalamud.Game.ClientState.Conditions;
 using VoiceMaster.Enums;
 using System;
+using System.Collections.Generic;
 using VoiceMaster.DataClasses;
 using System.Linq;
-using System.Collections.Generic;
 using Dalamud.Game.Text.SeStringHandling;
 using GameObject = Dalamud.Game.ClientState.Objects.Types.IGameObject;
 using System.Reflection;
@@ -46,70 +45,6 @@ public partial class Plugin : IDalamudPlugin
     internal static ConfigWindow ConfigWindow { get; private set; } = null!;
     internal static AlltalkInstanceWindow AlltalkInstanceWindow { get; private set; } = null!;
     internal static FirstTimeWindow FirstTimeWindow { get; private set; } = null!;
-
-    // Runtime ignore sets (not persisted unless added to Configuration.IgnoredNpcAlways)
-    internal static readonly HashSet<string> IgnoredNpcSession = new(StringComparer.OrdinalIgnoreCase);
-    internal static readonly HashSet<string> IgnoredNpcInstance = new(StringComparer.OrdinalIgnoreCase);
-
-    internal static string NormalizeSpeakerKey(string? name)
-        => (name ?? string.Empty).Trim();
-
-    internal static void ClearInstanceIgnoresIfNotInDuty()
-    {
-        // Instance ignores only make sense while "BoundByDuty" is true.
-        if (!Condition[ConditionFlag.BoundByDuty] && IgnoredNpcInstance.Count > 0)
-            IgnoredNpcInstance.Clear();
-    }
-
-    internal static bool ShouldIgnoreNpcSpeaker(string? speakerName)
-    {
-        ClearInstanceIgnoresIfNotInDuty();
-        var key = NormalizeSpeakerKey(speakerName);
-        if (string.IsNullOrWhiteSpace(key))
-            return false;
-
-        if (IgnoredNpcInstance.Contains(key))
-            return true;
-        if (IgnoredNpcSession.Contains(key))
-            return true;
-
-        // Persisted ignores
-        var always = Configuration.IgnoredNpcAlways;
-        return always != null && always.Any(x => x.Equals(key, StringComparison.OrdinalIgnoreCase));
-    }
-
-    internal static void AddIgnoredNpc(string speakerName, int scope)
-    {
-        var key = NormalizeSpeakerKey(speakerName);
-        if (string.IsNullOrWhiteSpace(key))
-            return;
-
-        // 0 instance, 1 session, 2 always
-        if (scope <= 0)
-            IgnoredNpcInstance.Add(key);
-        else if (scope == 1)
-            IgnoredNpcSession.Add(key);
-        else
-        {
-            if (!Configuration.IgnoredNpcAlways.Any(x => x.Equals(key, StringComparison.OrdinalIgnoreCase)))
-                Configuration.IgnoredNpcAlways.Add(key);
-            Configuration.Save();
-        }
-    }
-
-    internal static void RemoveIgnoredNpcEverywhere(string speakerName)
-    {
-        var key = NormalizeSpeakerKey(speakerName);
-        if (string.IsNullOrWhiteSpace(key))
-            return;
-
-        IgnoredNpcInstance.Remove(key);
-        IgnoredNpcSession.Remove(key);
-
-        if (Configuration.IgnoredNpcAlways.RemoveAll(x => x.Equals(key, StringComparison.OrdinalIgnoreCase)) > 0)
-            Configuration.Save();
-    }
-
     internal static DialogExtraOptionsWindow DialogExtraOptionsWindow { get; private set; } = null!;
 
     internal static LipSyncHelper LipSyncHelper{ get; private set; } = null!;
@@ -123,7 +58,52 @@ public partial class Plugin : IDalamudPlugin
 
     public readonly WindowSystem WindowSystem = new("VoiceMaster");
 
-    public Plugin(
+    
+
+// --- NPC ignore lists (required by helpers/commands) ---
+// These are intentionally lightweight "baseline" stubs to satisfy CommandHelper/BackendHelper
+// without reintroducing complex behavior.
+public static readonly HashSet<string> IgnoredNpcSession = new(StringComparer.OrdinalIgnoreCase);
+public static readonly HashSet<string> IgnoredNpcInstance = new(StringComparer.OrdinalIgnoreCase);
+
+public static bool ShouldIgnoreNpcSpeaker(string? speakerName)
+{
+    if (string.IsNullOrWhiteSpace(speakerName))
+        return false;
+
+    var key = speakerName.Trim();
+    return IgnoredNpcSession.Contains(key) || IgnoredNpcInstance.Contains(key);
+}
+
+public static void AddIgnoredNpc(string speakerName, bool everywhere)
+{
+    if (string.IsNullOrWhiteSpace(speakerName))
+        return;
+
+    var key = speakerName.Trim();
+
+    // "Everywhere" is treated as session-level ignore by default in this baseline.
+    if (everywhere)
+        IgnoredNpcSession.Add(key);
+    else
+        IgnoredNpcInstance.Add(key);
+}
+
+// Some command paths pass an int flag (0/1). Keep this overload to avoid call-site churn.
+public static void AddIgnoredNpc(string speakerName, int everywhereFlag) =>
+    AddIgnoredNpc(speakerName, everywhereFlag != 0);
+
+public static void RemoveIgnoredNpcEverywhere(string speakerName)
+{
+    if (string.IsNullOrWhiteSpace(speakerName))
+        return;
+
+    var key = speakerName.Trim();
+    IgnoredNpcSession.Remove(key);
+    IgnoredNpcInstance.Remove(key);
+}
+
+public Plugin(
         IDalamudPluginInterface pluginInterface,
         IPluginLog log,
         ICommandManager commandManager,

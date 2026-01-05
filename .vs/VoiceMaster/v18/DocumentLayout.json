@@ -3,12 +3,24 @@
   "WorkspaceRootPath": "C:\\Users\\kruil\\Documents\\Projects\\output\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{8B3A7F9D-4C2E-4A1B-9D3C-7F8E5A2B1C3D}|VoiceMaster\\VoiceMaster.csproj|c:\\users\\kruil\\documents\\projects\\output\\voicemaster\\backends\\alltalkbackend.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{8B3A7F9D-4C2E-4A1B-9D3C-7F8E5A2B1C3D}|VoiceMaster\\VoiceMaster.csproj|solutionrelative:voicemaster\\backends\\alltalkbackend.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{8B3A7F9D-4C2E-4A1B-9D3C-7F8E5A2B1C3D}|VoiceMaster\\VoiceMaster.csproj|c:\\users\\kruil\\documents\\projects\\output\\voicemaster\\plugin.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{8B3A7F9D-4C2E-4A1B-9D3C-7F8E5A2B1C3D}|VoiceMaster\\VoiceMaster.csproj|solutionrelative:voicemaster\\plugin.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{8B3A7F9D-4C2E-4A1B-9D3C-7F8E5A2B1C3D}|VoiceMaster\\VoiceMaster.csproj|c:\\users\\kruil\\documents\\projects\\output\\voicemaster\\helper\\functional\\lipsynchelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{8B3A7F9D-4C2E-4A1B-9D3C-7F8E5A2B1C3D}|VoiceMaster\\VoiceMaster.csproj|solutionrelative:voicemaster\\helper\\functional\\lipsynchelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{8B3A7F9D-4C2E-4A1B-9D3C-7F8E5A2B1C3D}|VoiceMaster\\VoiceMaster.csproj|c:\\users\\kruil\\documents\\projects\\output\\voicemaster\\voicemaster.csproj||{04B8AB82-A572-4FEF-95CE-5222444B6B64}|",
       "RelativeMoniker": "D:0:0:{8B3A7F9D-4C2E-4A1B-9D3C-7F8E5A2B1C3D}|VoiceMaster\\VoiceMaster.csproj|solutionrelative:voicemaster\\voicemaster.csproj||{04B8AB82-A572-4FEF-95CE-5222444B6B64}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{8B3A7F9D-4C2E-4A1B-9D3C-7F8E5A2B1C3D}|VoiceMaster\\VoiceMaster.csproj|c:\\users\\kruil\\documents\\projects\\output\\voicemaster\\helper\\functional\\live3daudioengine.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{8B3A7F9D-4C2E-4A1B-9D3C-7F8E5A2B1C3D}|VoiceMaster\\VoiceMaster.csproj|solutionrelative:voicemaster\\helper\\functional\\live3daudioengine.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{8B3A7F9D-4C2E-4A1B-9D3C-7F8E5A2B1C3D}|VoiceMaster\\VoiceMaster.csproj|c:\\users\\kruil\\documents\\projects\\output\\voicemaster\\backends\\alltalkbackend.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{8B3A7F9D-4C2E-4A1B-9D3C-7F8E5A2B1C3D}|VoiceMaster\\VoiceMaster.csproj|solutionrelative:voicemaster\\backends\\alltalkbackend.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -18,7 +30,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 4,
+          "SelectedChildIndex": 6,
           "Children": [
             {
               "$type": "Bookmark",
@@ -38,7 +50,46 @@
             },
             {
               "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "LipSyncHelper.cs",
+              "DocumentMoniker": "C:\\Users\\kruil\\Documents\\Projects\\output\\VoiceMaster\\Helper\\Functional\\LipSyncHelper.cs",
+              "RelativeDocumentMoniker": "VoiceMaster\\Helper\\Functional\\LipSyncHelper.cs",
+              "ToolTip": "C:\\Users\\kruil\\Documents\\Projects\\output\\VoiceMaster\\Helper\\Functional\\LipSyncHelper.cs",
+              "RelativeToolTip": "VoiceMaster\\Helper\\Functional\\LipSyncHelper.cs",
+              "ViewState": "AgIAADoBAAAAAAAAAAAYwE0BAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-04T19:07:38.622Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "Live3DAudioEngine.cs",
+              "DocumentMoniker": "C:\\Users\\kruil\\Documents\\Projects\\output\\VoiceMaster\\Helper\\Functional\\Live3DAudioEngine.cs",
+              "RelativeDocumentMoniker": "VoiceMaster\\Helper\\Functional\\Live3DAudioEngine.cs",
+              "ToolTip": "C:\\Users\\kruil\\Documents\\Projects\\output\\VoiceMaster\\Helper\\Functional\\Live3DAudioEngine.cs",
+              "RelativeToolTip": "VoiceMaster\\Helper\\Functional\\Live3DAudioEngine.cs",
+              "ViewState": "AgIAAO0DAAAAAAAAAAAYwPkDAAARAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-04T18:35:12.819Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "Plugin.cs",
+              "DocumentMoniker": "C:\\Users\\kruil\\Documents\\Projects\\output\\VoiceMaster\\Plugin.cs",
+              "RelativeDocumentMoniker": "VoiceMaster\\Plugin.cs",
+              "ToolTip": "C:\\Users\\kruil\\Documents\\Projects\\output\\VoiceMaster\\Plugin.cs",
+              "RelativeToolTip": "VoiceMaster\\Plugin.cs",
+              "ViewState": "AgIAAJwBAAAAAAAAAAAqwLUBAAAfAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-04T17:31:16.186Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
               "Title": "AlltalkBackend.cs",
               "DocumentMoniker": "C:\\Users\\kruil\\Documents\\Projects\\output\\VoiceMaster\\Backends\\AlltalkBackend.cs",
               "RelativeDocumentMoniker": "VoiceMaster\\Backends\\AlltalkBackend.cs",
@@ -51,14 +102,15 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 2,
               "Title": "VoiceMaster",
               "DocumentMoniker": "C:\\Users\\kruil\\Documents\\Projects\\output\\VoiceMaster\\VoiceMaster.csproj",
               "RelativeDocumentMoniker": "VoiceMaster\\VoiceMaster.csproj",
               "ToolTip": "C:\\Users\\kruil\\Documents\\Projects\\output\\VoiceMaster\\VoiceMaster.csproj",
               "RelativeToolTip": "VoiceMaster\\VoiceMaster.csproj",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
-              "WhenOpened": "2026-01-03T18:22:08.496Z"
+              "WhenOpened": "2026-01-03T18:22:08.496Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Bookmark",

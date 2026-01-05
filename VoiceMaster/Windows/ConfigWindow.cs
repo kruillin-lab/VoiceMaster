@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Interface.Windowing;
 using VoiceMaster.DataClasses;
 using VoiceMaster.Enums;
@@ -42,14 +43,13 @@ public class ConfigWindow : Window, IDisposable
     private string filterGenderPlayers = "";
     private string filterRacePlayers = "";
     private string filterNamePlayers = "";
+    private string filterWorldPlayers = "";
+    // Manual add (Players) - B+ identity uses Name + HomeWorld
+    private string _addPlayerName = "";
+    private int _addPlayerWorldIndex = 0;
+    private int _addPlayerVoiceIndex = 0;
+
     private string filterVoicePlayers = "";
-
-    // Manual player add (UI fields)
-    private string _manualPlayerName = string.Empty;
-    private int _manualPlayerGenderIndex = 0;
-    private int _manualPlayerRaceIndex = 0;
-    private int _manualPlayerVoiceIndex = 0;
-
     private List<NpcMapData> filteredBubbles = [];
     public static bool UpdateDataBubbles { get; set; }
     private bool resetDataBubbles;
@@ -794,7 +794,7 @@ public class ConfigWindow : Window, IDisposable
                     {
                         DrawVoiceSelectionTable("NPCs", Plugin.Configuration!.MappedNpcs, ref filteredNpcs,
                                                 ref _updateDataNpcs, ref resetDataNpcs, ref filterGenderNpcs,
-                                                ref filterRaceNpcs, ref filterNameNpcs, ref filterVoiceNpcs);
+                                                ref filterRaceNpcs, ref filterNameNpcs, ref filterVoiceNpcs, ref filterNameNpcs /*unused world*/);
                     }
                 }
 
@@ -802,76 +802,95 @@ public class ConfigWindow : Window, IDisposable
                 {
                     if (tabItemPlayers)
                     {
+                        // Manual add player mapping (Name + HomeWorld)
                         ImGui.Separator();
-                        ImGui.TextUnformatted("Manual Add Player");
-                        ImGui.Separator();
+            ImGui.TextUnformatted("Add Player");
+ImGui.SetNextItemWidth(220f);
+                        ImGui.InputText("Name##EKAddPlayerName", ref _addPlayerName, 64);
 
-                        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
-                        ImGui.InputText("##VMManualPlayerName", ref _manualPlayerName, 64);
+                        var worldNames = VoiceMaster.Helper.DataHelper.LuminaHelper.GetWorldNames();
+                        if (_addPlayerWorldIndex < 0 || _addPlayerWorldIndex >= worldNames.Count)
+                            _addPlayerWorldIndex = 0;
+                        ImGui.SameLine();
+                        ImGui.SetNextItemWidth(220f);
+                        var worldArr = worldNames.ToArray();
+                        ImGui.Combo("World##EKAddPlayerWorld", ref _addPlayerWorldIndex, worldArr, worldArr.Length);
 
-                        // Gender / Race
-                        var gIdx = _manualPlayerGenderIndex;
-                        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
-                        if (ImGui.Combo("##VMManualPlayerGender", ref gIdx, Constants.GENDERNAMESLIST, Constants.GENDERNAMESLIST.Length))
-                            _manualPlayerGenderIndex = gIdx;
+                        var voiceArrAdd = Plugin.Configuration!.VoiceMasterVoices.ConvertAll(p => p.ToString()).ToArray();
+                        if (_addPlayerVoiceIndex < 0 || _addPlayerVoiceIndex >= voiceArrAdd.Length)
+                            _addPlayerVoiceIndex = 0;
+                        ImGui.SameLine();
+                        ImGui.SetNextItemWidth(260f);
+                        ImGui.Combo("Voice##EKAddPlayerVoice", ref _addPlayerVoiceIndex, voiceArrAdd, voiceArrAdd.Length);
 
-                        var rIdx = _manualPlayerRaceIndex;
-                        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
-                        if (ImGui.Combo("##VMManualPlayerRace", ref rIdx, Constants.RACENAMESLIST, Constants.RACENAMESLIST.Length))
-                            _manualPlayerRaceIndex = rIdx;
-
-                        // Voice dropdown
-                        var voicesForDropdown = Plugin.Configuration!.VoiceMasterVoices.Where(v => v.IsEnabled).ToList();
-                        var voiceNames = voicesForDropdown.ConvertAll(v => v.VoiceNameNote).ToArray();
-                        if (voiceNames.Length == 0)
-                            voiceNames = new[] { "No voices loaded" };
-
-                        var vIdx = _manualPlayerVoiceIndex;
-                        if (vIdx < 0) vIdx = 0;
-                        if (vIdx >= voiceNames.Length) vIdx = 0;
-
-                        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
-                        if (ImGui.Combo("##VMManualPlayerVoice", ref vIdx, voiceNames, voiceNames.Length))
-                            _manualPlayerVoiceIndex = vIdx;
-
-                        if (ImGui.Button("Add Player"))
+                        ImGui.SameLine();
+                        if (ImGuiUtil.DrawDisabledButton($"{FontAwesomeIcon.Plus.ToIconString()}##EKAddPlayerButton", new Vector2(25, 25), "Add player mapping", false, true))
                         {
-                            var name = (_manualPlayerName ?? string.Empty).Trim();
-                            if (!string.IsNullOrWhiteSpace(name))
+                            var nameRaw = _addPlayerName?.Trim() ?? string.Empty;
+                            if (nameRaw.Length > 0)
                             {
-                                var exists = Plugin.Configuration.MappedPlayers.Any(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
-                                if (!exists)
+                                string name = nameRaw;
+                                string homeWorld = (_addPlayerWorldIndex > 0 && _addPlayerWorldIndex < worldNames.Count)
+                                    ? worldNames[_addPlayerWorldIndex]
+                                    : string.Empty;
+
+                                // If user pasted Name@World, split it and prefer the pasted world
+                                var atIdx = name.IndexOf('@');
+                                if (atIdx > 0 && atIdx < name.Length - 1)
                                 {
-                                    var data = new NpcMapData(Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player)
+                                    var pastedName = name.Substring(0, atIdx).Trim();
+                                    var pastedWorld = name.Substring(atIdx + 1).Trim();
+                                    if (!string.IsNullOrWhiteSpace(pastedName))
+                                        name = pastedName;
+                                    if (!string.IsNullOrWhiteSpace(pastedWorld))
+                                        homeWorld = pastedWorld;
+                                }
+
+                                var selectedVoice = Plugin.Configuration.VoiceMasterVoices[_addPlayerVoiceIndex];
+
+                                // Deduplicate by Name + HomeWorld (case-insensitive).
+                                var existing = Plugin.Configuration.MappedPlayers.Find(p =>
+                                    string.Equals(p.Name ?? string.Empty, name, StringComparison.OrdinalIgnoreCase) &&
+                                    string.Equals(p.HomeWorld ?? string.Empty, homeWorld, StringComparison.OrdinalIgnoreCase));
+
+                                if (existing != null)
+                                {
+                                    existing.Voice = selectedVoice;
+                                    existing.ObjectKind = ObjectKind.Player;
+                                    existing.Name = name;
+                                    existing.HomeWorld = homeWorld;
+                                    existing.RefreshSelectable();
+                                }
+                                else
+                                {
+                                    var data = new VoiceMaster.DataClasses.NpcMapData(ObjectKind.Player)
                                     {
                                         Name = name,
-                                        Gender = Constants.GENDERLIST[Math.Clamp(_manualPlayerGenderIndex, 0, Constants.GENDERLIST.Count - 1)],
-                                        Race = Constants.RACELIST[Math.Clamp(_manualPlayerRaceIndex, 0, Constants.RACELIST.Count - 1)],
+                                        HomeWorld = homeWorld,
+                                        ObjectKind = ObjectKind.Player,
+                                        Gender = Genders.None,
+                                        Race = NpcRaces.Unknown,
                                         RaceStr = string.Empty,
                                         IsChild = false,
                                         IsEnabled = true,
                                         IsEnabledBubble = true,
+                                        Volume = 1f,
+                                        VolumeBubble = 1f,
                                     };
-
-                                    if (voicesForDropdown.Count > 0)
-                                    {
-                                        var chosen = voicesForDropdown[Math.Clamp(_manualPlayerVoiceIndex, 0, voicesForDropdown.Count - 1)];
-                                        data.voice = chosen.BackendVoice ?? string.Empty;
-                                    }
-
+                                    data.Voices = Plugin.Configuration.VoiceMasterVoices;
+                                    data.Voice = selectedVoice;
                                     data.RefreshSelectable();
                                     Plugin.Configuration.MappedPlayers.Add(data);
-                                    Plugin.Configuration.Save();
-                                    _manualPlayerName = string.Empty;
-                                    UpdateDataPlayers = true;
                                 }
+
+                                Plugin.Configuration.Save();
+                                UpdateDataPlayers = true;
                             }
                         }
 
-                        ImGui.Separator();
                         DrawVoiceSelectionTable("Players", Plugin.Configuration!.MappedPlayers, ref filteredPlayers,
                                                 ref _updateDataNpcs, ref resetDataPlayers, ref filterGenderPlayers,
-                                                ref filterRacePlayers, ref filterNamePlayers, ref filterVoicePlayers);
+                                                ref filterRacePlayers, ref filterNamePlayers, ref filterVoicePlayers, ref filterWorldPlayers);
                     }
                 }
 
@@ -881,7 +900,7 @@ public class ConfigWindow : Window, IDisposable
                     {
                         DrawVoiceSelectionTable("Bubbles", Plugin.Configuration!.MappedNpcs, ref filteredBubbles,
                                                 ref _updateDataNpcs, ref resetDataBubbles, ref filterGenderBubbles,
-                                                ref filterRaceBubbles, ref filterNameBubbles, ref filterVoiceBubbles,
+                                                ref filterRaceBubbles, ref filterNameBubbles, ref filterVoiceBubbles, ref filterNameBubbles /*unused world*/,
                                                 true);
                     }
                 }
@@ -986,7 +1005,8 @@ public class ConfigWindow : Window, IDisposable
                 var sortSpecs = ImGui.TableGetSortSpecs();
                 if (sortSpecs.SpecsDirty)
                 {
-                    switch (sortSpecs.Specs.ColumnIndex)
+                    var sortCol = sortSpecs.Specs.ColumnIndex;
+                switch (sortCol)
                     {
                         case 2:
                             if (sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
@@ -1227,7 +1247,7 @@ public class ConfigWindow : Window, IDisposable
         }
     }
 
-    private void DrawVoiceSelectionTable(string dataType, List<NpcMapData> realData, ref List<NpcMapData> filteredData, ref bool updateData, ref bool resetData, ref string filterGender, ref string filterRace, ref string filterName, ref string filterVoice, bool isBubble = false)
+    private void DrawVoiceSelectionTable(string dataType, List<NpcMapData> realData, ref List<NpcMapData> filteredData, ref bool updateData, ref bool resetData, ref string filterGender, ref string filterRace, ref string filterName, ref string filterVoice, ref string filterWorld, bool isBubble = false)
     {
         if (filteredData.Count == 0)
         {
@@ -1244,7 +1264,9 @@ public class ConfigWindow : Window, IDisposable
             resetData = false;
         }
 
-        using var table = ImRaii.Table($"{dataType} Table##{dataType}Table", 11, ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.RowBg | ImGuiTableFlags.Sortable | ImGuiTableFlags.ScrollX | ImGuiTableFlags.ScrollY);
+        var isPlayersTable = dataType == "Players";
+
+        using var table = ImRaii.Table($"{dataType} Table##{dataType}Table", isPlayersTable ? 12 : 11, ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.RowBg | ImGuiTableFlags.Sortable | ImGuiTableFlags.ScrollX | ImGuiTableFlags.ScrollY);
         if (table)
         {
             ImGui.TableSetupScrollFreeze(0, 2); // Make top row always visible
@@ -1255,6 +1277,8 @@ public class ConfigWindow : Window, IDisposable
             ImGui.TableSetupColumn("Gender", ImGuiTableColumnFlags.WidthFixed, 125);
             ImGui.TableSetupColumn("Race", ImGuiTableColumnFlags.WidthFixed, 125);
             ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthFixed, 200);
+            if (isPlayersTable)
+                ImGui.TableSetupColumn("World", ImGuiTableColumnFlags.WidthFixed, 140);
             ImGui.TableSetupColumn("Voice", ImGuiTableColumnFlags.WidthStretch, 250);
             ImGui.TableSetupColumn("Volume", ImGuiTableColumnFlags.WidthFixed, 200f);
             ImGui.TableSetupColumn($"##{dataType}saves", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 25f);
@@ -1291,6 +1315,20 @@ public class ConfigWindow : Window, IDisposable
                 updateData = true;
                 resetData = true;
             }
+
+            if (isPlayersTable)
+            {
+                ImGui.TableNextColumn();
+                ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+                if (ImGui.InputText($"##EKFilterNpcWorld", ref filterWorld, 40) || (filterWorld.Length > 0 && updateData))
+                {
+                    var world = filterWorld;
+                    filteredData = filteredData.FindAll(p => (p.HomeWorld ?? string.Empty).ToLower().Contains(world.ToLower()));
+                    updateData = true;
+                    resetData = true;
+                }
+            }
+
             ImGui.TableNextColumn();
             ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
             if (ImGui.InputText($"##EKFilterNpcVoice", ref filterVoice, 40) || (filterVoice.Length > 0 && updateData))
@@ -1304,7 +1342,8 @@ public class ConfigWindow : Window, IDisposable
             var sortSpecs = ImGui.TableGetSortSpecs();
             if (sortSpecs.SpecsDirty || updateData)
             {
-                switch (sortSpecs.Specs.ColumnIndex)
+                var sortCol = sortSpecs.Specs.ColumnIndex;
+                switch (sortCol)
                 {
                     case 0:
                         if (sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
@@ -1338,11 +1377,17 @@ public class ConfigWindow : Window, IDisposable
                         break;
                     case 5:
                         if (sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
+                            filteredData.Sort((a, b) => string.Compare(a.HomeWorld ?? string.Empty, b.HomeWorld ?? string.Empty));
+                        else
+                            filteredData.Sort((a, b) => string.Compare(b.HomeWorld ?? string.Empty, a.HomeWorld ?? string.Empty));
+                        break;
+                    case 6:
+                        if (sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
                             filteredData.Sort((a, b) => string.Compare(a.Voice?.ToString(), b.Voice?.ToString()));
                         else
                             filteredData.Sort((a, b) => string.Compare(b.Voice?.ToString(), a.Voice?.ToString()));
                         break;
-                    case 6:
+                    case 7:
                         if (sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
                             filteredData.Sort((a, b) => string.Compare(isBubble ? b.VolumeBubble.ToString() : b.Volume.ToString(), isBubble ? a.VolumeBubble.ToString() : a.Volume.ToString()));
                         else
@@ -1395,7 +1440,7 @@ public class ConfigWindow : Window, IDisposable
                     var newGender = Constants.GENDERLIST[presetIndexGender];
                     if (newGender != mapData.Gender)
                     {
-                        if (realData.Contains(new NpcMapData(mapData.ObjectKind) { Gender = newGender, Race = mapData.Race, Name = mapData.Name }))
+                        if (realData.Contains(new NpcMapData(mapData.ObjectKind) { Gender = newGender, Race = mapData.Race, Name = mapData.Name, HomeWorld = mapData.HomeWorld }))
                             toBeRemoved = mapData;
                         else
                         {
@@ -1419,7 +1464,7 @@ public class ConfigWindow : Window, IDisposable
                     var newRace = Constants.RACELIST[presetIndexRace];
                     if (newRace != mapData.Race)
                     {
-                        if (realData.Contains(new NpcMapData(mapData.ObjectKind) { Gender = mapData.Gender, Race = newRace, Name = mapData.Name }))
+                        if (realData.Contains(new NpcMapData(mapData.ObjectKind) { Gender = mapData.Gender, Race = newRace, Name = mapData.Name, HomeWorld = mapData.HomeWorld }))
                             toBeRemoved = mapData;
                         else
                         {
@@ -1437,6 +1482,36 @@ public class ConfigWindow : Window, IDisposable
                 }
                 ImGui.TableNextColumn();
                 ImGui.TextUnformatted(mapData.Name);
+
+                if (isPlayersTable)
+                {
+                    ImGui.TableNextColumn();
+                    ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+                    var worlds = VoiceMaster.Helper.DataHelper.LuminaHelper.GetWorldNames();
+                    if (worlds.Count == 0)
+                    {
+                        ImGui.TextUnformatted(mapData.HomeWorld ?? string.Empty);
+                    }
+                    else
+                    {
+                        var currentWorld = mapData.HomeWorld ?? string.Empty;
+                        var idx = worlds.FindIndex(w => string.Equals(w, currentWorld, StringComparison.OrdinalIgnoreCase));
+                        if (idx < 0) idx = 0;
+                        var arr = worlds.ToArray();
+                        if (ImGui.Combo($"##EKPlayerWorld{mapData.ToString()}", ref idx, arr, arr.Length))
+                        {
+                            var newWorld = arr[idx];
+                            if (!string.Equals(newWorld, mapData.HomeWorld, StringComparison.OrdinalIgnoreCase))
+                            {
+                                mapData.HomeWorld = string.Equals(newWorld, "(Any)", StringComparison.OrdinalIgnoreCase) ? string.Empty : newWorld;
+                                mapData.DoNotDelete = true;
+                                updateData = true;
+                                Plugin.Configuration.Save();
+                            }
+                        }
+                    }
+                }
+
                 ImGui.TableNextColumn();
                 ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
 
@@ -1591,7 +1666,8 @@ public class ConfigWindow : Window, IDisposable
                 var sortSpecs = ImGui.TableGetSortSpecs();
                 if (sortSpecs.SpecsDirty || updatePhonData)
                 {
-                    switch (sortSpecs.Specs.ColumnIndex)
+                    var sortCol = sortSpecs.Specs.ColumnIndex;
+                switch (sortCol)
                     {
                         case 1:
                             if (sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
@@ -2055,7 +2131,8 @@ public class ConfigWindow : Window, IDisposable
                     var sortSpecs = ImGui.TableGetSortSpecs();
                     if (sortSpecs.SpecsDirty || updateLogs)
                     {
-                        switch (sortSpecs.Specs.ColumnIndex)
+                        var sortCol = sortSpecs.Specs.ColumnIndex;
+                switch (sortCol)
                         {
                             case 0:
                                 if (sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
