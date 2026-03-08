@@ -23,6 +23,12 @@ public sealed class Live3DAudioEngine : IDisposable
 {
     public event Action<Guid>? SourceEnded;
 
+    /// <summary>
+    /// Event triggered when a voice line starts playing.
+    /// The Guid parameter is the unique identifier of the audio source.
+    /// </summary>
+    public event Action<Guid>? VoiceLineStarted;
+
     readonly int _deviceIndex;
     bool _inited;
 
@@ -131,6 +137,7 @@ public sealed class Live3DAudioEngine : IDisposable
                            int sampleRate = 24000,
                            int channels = 1,
                            bool float32 = false,
+                           bool use3D = true,
                            int bufferMs = 350,
                            int readChunkMs = 20,
                            bool leaveOpen = false,
@@ -141,12 +148,12 @@ public sealed class Live3DAudioEngine : IDisposable
                            int pollIntervalMs = 15)
     {
         EnsureInit();
-        if (channels != 1) throw new InvalidOperationException("3D benötigt Mono (1 Kanal).");
+        if (use3D && channels != 1) throw new InvalidOperationException("3D benötigt Mono (1 Kanal).");
 
         pollIntervalMs = Math.Min(pollIntervalMs, _listenerIntervalMs);
 
         var id = Guid.NewGuid();
-        var src = new Source(this, id, source, sampleRate, channels, float32, bufferMs, readChunkMs,
+        var src = new Source(this, id, source, sampleRate, channels, float32, use3D, bufferMs, readChunkMs,
                              leaveOpen, autoDetectWavHeader, volume, initialPosition ?? new Vector3D(), positionProvider, pollIntervalMs);
         if (!_sources.TryAdd(id, src))
             throw new InvalidOperationException("ID collision.");
@@ -175,8 +182,10 @@ public sealed class Live3DAudioEngine : IDisposable
         if (_inited) return;
 
         // robustere globale Audio-Buffering-Settings
-        Bass.Configure(Configuration.UpdatePeriod, 10);  // ms
-        Bass.Configure(Configuration.DeviceBufferLength, 120); // ms
+        // Choppy/crispy playback is almost always an underrun problem on some devices.
+        // Give BASS a bit more breathing room globally.
+        Bass.Configure(Configuration.UpdatePeriod, 20);        // ms
+        Bass.Configure(Configuration.DeviceBufferLength, 300); // ms
         Bass.Configure(Configuration.SRCQuality, 4);            // better SRC
 
         if (!Bass.Init(_deviceIndex, 48000, DeviceInitFlags.Default | DeviceInitFlags.Device3D) &&
@@ -208,6 +217,7 @@ public sealed class Live3DAudioEngine : IDisposable
         readonly Stream _source;
         readonly bool _leaveOpen;
         readonly bool _autoDetectWav;
+        readonly bool _use3D;
         readonly int _bufferMs;
         readonly int _readChunkMs;
 
@@ -265,7 +275,7 @@ public sealed class Live3DAudioEngine : IDisposable
         }
 
         public Source(Live3DAudioEngine engine, Guid id, Stream source,
-                      int sampleRate, int channels, bool float32,
+                      int sampleRate, int channels, bool float32, bool use3D,
                       int bufferMs, int readChunkMs,
                       bool leaveOpen, bool autoDetectWavHeader,
                       double initialVolume, Vector3D initialPos,
@@ -278,6 +288,7 @@ public sealed class Live3DAudioEngine : IDisposable
             _ch = channels;
             _bitsIn = float32 ? 32 : 16;
             _isIEEEFloatIn = float32;
+            _use3D = use3D;
             _bufferMs = bufferMs;
             _readChunkMs = readChunkMs;
             _leaveOpen = leaveOpen;
@@ -286,7 +297,7 @@ public sealed class Live3DAudioEngine : IDisposable
             _srcPos = initialPos;
             _positionProvider = posProvider;
             _q = new BlockingCollection<byte[]>(new ConcurrentQueue<byte[]>(), 256);
-            if (posProvider != null)
+            if (_use3D && posProvider != null)
                 _pollTimer = new Timer(_ => PollPosition(), null, pollIntervalMs, pollIntervalMs);
         }
 
@@ -312,27 +323,32 @@ public sealed class Live3DAudioEngine : IDisposable
                 _headerChecked = true;
             }
 
-            if (_ch != 1) throw new InvalidOperationException("3D benötigt Mono (1 Kanal).");
+            if (_use3D && _ch != 1) throw new InvalidOperationException("3D benötigt Mono (1 Kanal).");
 
             _bytesPerSampleIn = Math.Max(2, _bitsIn / 8);
             _convertToFloat = !_isIEEEFloatIn && _bitsIn != 16;
-            var outFlags = (_isIEEEFloatIn || _convertToFloat) ? (BassFlags.Float | BassFlags.Bass3D)
-                                                               : (BassFlags.Default | BassFlags.Bass3D);
+            var outFlags = (_isIEEEFloatIn || _convertToFloat) ? (BassFlags.Float)
+                                                               : (BassFlags.Default);
+            if (_use3D) outFlags |= BassFlags.Bass3D;
             _bytesPerSampleOut = (_isIEEEFloatIn || _convertToFloat) ? 4 : 2;
 
             _h = Bass.CreateStream(_sr, _ch, outFlags, StreamProcedureType.Push);
             if (_h == 0)
                 throw new InvalidOperationException($"CreateStream failed: {Bass.LastError}");
 
-            Bass.ChannelSet3DAttributes(_h, ManagedBass.Mode3D.Normal, 1f, 0f, -1, -1, 0);
+            if (_use3D)
+                Bass.ChannelSet3DAttributes(_h, ManagedBass.Mode3D.Normal, 1f, 0f, -1, -1, 0);
 
             // robuster Start: etwas größerer Channel-Buffer (>=450 ms)
             var channelBufferMs = MathF.Max(_bufferMs, 450);
             Bass.ChannelSetAttribute(_h, ChannelAttribute.Buffer, channelBufferMs / 1000f);
 
             Bass.ChannelSetAttribute(_h, ChannelAttribute.Volume, 1f);
-            Bass.ChannelSet3DPosition(_h, _srcPos, null, new Vector3D());
-            Bass.Apply3D();
+            if (_use3D)
+            {
+                Bass.ChannelSet3DPosition(_h, _srcPos, null, new Vector3D());
+                Bass.Apply3D();
+            }
             AttachVolumeDspIfNeeded();
 
             _endSync = OnEndSync;
@@ -354,6 +370,7 @@ public sealed class Live3DAudioEngine : IDisposable
             _lastTicks = Stopwatch.GetTimestamp();
             PrebufferAndStartWithFadeIn(skipPrimingSilence: true);
             SetState(PlaybackState.Playing);
+            _engine.VoiceLineStarted?.Invoke(_id);
         }
 
         void PrimePushStreamSilence()
@@ -800,7 +817,9 @@ public sealed class Live3DAudioEngine : IDisposable
                 _playGate.Wait(_cts.Token);
                 int wrote = PutData(_h, data, offset, data.Length - offset);
                 if (wrote < 0) throw new InvalidOperationException($"StreamPutData failed: {Bass.LastError}");
-                if (wrote == 0) { await Task.Delay(5, _cts.Token).ConfigureAwait(false); continue; }
+                // StreamPutData can temporarily return 0 when BASS' internal buffer is full.
+                // Keep the wait tiny so we don't starve the writer and cause audible underruns.
+                if (wrote == 0) { await Task.Delay(1, _cts.Token).ConfigureAwait(false); continue; }
                 offset += wrote;
             }
         }

@@ -11,6 +11,20 @@ This is a **pure, complete copy of Echokraut** with all references changed from 
 - Project files renamed
 - Assembly name updated
 
+## Recent Updates (Inworld AI Integration)
+
+We have successfully integrated **Inworld AI** as a TTS backend, alongside Alltalk.
+
+### Inworld AI Backend
+- **Endpoint:** Uses the `v1/voice` (Non-Streaming) endpoint for maximum stability.
+- **Format:** Requests **MP3** audio to bypass decoding/header issues.
+- **Engine:** Passes MP3 streams directly to the `Live3DAudioEngine` (BASS), ensuring clean playback without static, clicking, or truncation.
+- **Features:**
+    - Supports API Key/Secret authentication.
+    - Allows selecting Workspace ID.
+    - Fetches available Characters/Voices dynamically from Inworld.
+    - Maps Inworld characters to FFXIV NPCs via the VoiceMaster UI.
+
 ## Key Changes from Echokraut
 
 **Branding:**
@@ -50,12 +64,12 @@ VoiceMaster inherits Echokraut's proven dialogue gating system:
 dotnet build VoiceMaster.csproj -c Release
 ```
 
-The compiled plugin will be in `bin/x64/Release/VoiceMaster.dll`
+The compiled plugin will be in `bin/Release/net8.0-windows/VoiceMaster.dll`
 
 ## Installation
 
 1. Build the project
-2. Copy `VoiceMaster.dll` and `VoiceMaster.json` to your Dalamud plugins folder
+2. Copy `VoiceMaster.dll`, `VoiceMaster.json`, and `bass.dll` to your Dalamud plugins folder (e.g. `%APPDATA%\XIVLauncher\devPlugins\VoiceMaster\`)
 3. Load in FFXIV
 
 ## Commands

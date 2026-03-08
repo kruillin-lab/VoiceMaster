@@ -20,6 +20,7 @@ using VoiceMaster.Helper.API;
 using VoiceMaster.Helper.Data;
 using VoiceMaster.Helper.Functional;
 using FFXIVClientStructs.FFXIV.Client.UI.Misc;
+using System.Threading.Tasks;
 
 namespace VoiceMaster;
 
@@ -143,7 +144,7 @@ public Plugin(
         DialogExtraOptionsWindow = new DialogExtraOptionsWindow();
 
         LogHelper.Initialize(log);
-        JsonLoaderHelper.Initialize(ClientState.ClientLanguage);
+        _ = Task.Run(() => JsonLoaderHelper.Initialize(ClientState.ClientLanguage));
         DetectLanguageHelper.Initialize();
         BackendHelper.Initialize(Configuration.BackendSelection);
         CommandHelper.Initialize();
@@ -300,6 +301,28 @@ public Plugin(
                 npcData.Name = DalamudHelper.LocalPlayer?.Name.ToString() ?? "PLAYER";
             else if (string.IsNullOrWhiteSpace(npcData.Name) && source == TextSource.AddonBubble)
                 npcData.Name = TalkTextHelper.GetBubbleName(speaker, cleanText);
+
+            // B+ player identity: try to populate HomeWorld for Players (Name + HomeWorld mapping key).
+            if (npcData.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player)
+            {
+                // Split formatted names like "Name@World" into Name + HomeWorld when present.
+                var rawName = npcData.Name ?? string.Empty;
+                var at = rawName.IndexOf('@');
+                if (at > 0 && at < rawName.Length - 1)
+                {
+                    var n = rawName.Substring(0, at).Trim();
+                    var w = rawName.Substring(at + 1).Trim();
+                    if (!string.IsNullOrWhiteSpace(n)) npcData.Name = n;
+                    if (string.IsNullOrWhiteSpace(npcData.HomeWorld) && !string.IsNullOrWhiteSpace(w)) npcData.HomeWorld = w;
+                }
+
+                // If HomeWorld is still empty and we have a speaker object, try Lumina-based lookup (safe reflection).
+                if (string.IsNullOrWhiteSpace(npcData.HomeWorld) && speaker != null)
+                {
+                    var hw = VoiceMaster.Helper.DataHelper.LuminaHelper.TryGetHomeWorldName(speaker);
+                    if (!string.IsNullOrWhiteSpace(hw)) npcData.HomeWorld = hw;
+                }
+            }
 
             var resNpcData = NpcDataHelper.GetAddCharacterMapData(npcData, eventId);
             Configuration.Save();

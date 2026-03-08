@@ -15,6 +15,7 @@ namespace VoiceMaster.Helper.API
 {
     public static class JsonLoaderHelper
     {
+        private const int RequestTimeoutMs = 5000;
         private static string RacePath = "https://raw.githubusercontent.com/RenNagasaki/Echokraut/master/Echokraut/Resources/NpcRaces.json";
         private static string GendersPath = "https://raw.githubusercontent.com/RenNagasaki/Echokraut/master/Echokraut/Resources/NpcGenders.json";
         private static string EmoticonPath = "https://raw.githubusercontent.com/RenNagasaki/Echokraut/master/Echokraut/Resources/Emoticons.json";
@@ -35,14 +36,24 @@ namespace VoiceMaster.Helper.API
             LoadVoiceNames(language);
         }
 
+        private static WebRequest CreateRequest(string url)
+        {
+            var request = WebRequest.Create(url);
+            request.Timeout = RequestTimeoutMs;
+
+            if (request is HttpWebRequest httpRequest)
+                httpRequest.ReadWriteTimeout = RequestTimeoutMs;
+
+            return request;
+        }
+
         private static void LoadModelsToRaceMap()
         {
             try
             {
-                var request = WebRequest.Create(RacePath);
-                WebResponse reply;
-                reply = request.GetResponse();
-                var returninfo = new StreamReader(reply.GetResponseStream());
+                var request = CreateRequest(RacePath);
+                using var reply = request.GetResponse();
+                using var returninfo = new StreamReader(reply.GetResponseStream());
                 var json = returninfo.ReadToEnd();
                 if (string.IsNullOrWhiteSpace(json))
                 {
@@ -64,10 +75,9 @@ namespace VoiceMaster.Helper.API
         {
             try
             {
-                var request = WebRequest.Create(GendersPath);
-                WebResponse reply;
-                reply = request.GetResponse();
-                var returninfo = new StreamReader(reply.GetResponseStream());
+                var request = CreateRequest(GendersPath);
+                using var reply = request.GetResponse();
+                using var returninfo = new StreamReader(reply.GetResponseStream());
                 var json = returninfo.ReadToEnd();
                 if (string.IsNullOrWhiteSpace(json))
                 {
@@ -89,10 +99,9 @@ namespace VoiceMaster.Helper.API
         {
             try
             {
-                var request = WebRequest.Create(EmoticonPath);
-                WebResponse reply;
-                reply = request.GetResponse();
-                var returninfo = new StreamReader(reply.GetResponseStream());
+                var request = CreateRequest(EmoticonPath);
+                using var reply = request.GetResponse();
+                using var returninfo = new StreamReader(reply.GetResponseStream());
                 var json = returninfo.ReadToEnd();
                 if (json == null)
                 {
@@ -131,10 +140,9 @@ namespace VoiceMaster.Helper.API
                         url = VoiceNamesFR;
                         break;
                 }
-                var request = WebRequest.Create(url);
-                WebResponse reply;
-                reply = request.GetResponse();
-                var returninfo = new StreamReader(reply.GetResponseStream());
+                var request = CreateRequest(url);
+                using var reply = request.GetResponse();
+                using var returninfo = new StreamReader(reply.GetResponseStream());
                 var json = returninfo.ReadToEnd();
                 if (json == null)
                 {

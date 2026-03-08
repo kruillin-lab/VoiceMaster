@@ -80,7 +80,7 @@ namespace VoiceMaster.Backend
             return null;
         }
 
-        public List<string> GetAvailableVoices(EKEventId eventId)
+        public async Task<List<string>> GetAvailableVoices(EKEventId eventId)
         {
             LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Loading Alltalk Voices", eventId);
             var mappedVoices = new List<string>();
@@ -90,9 +90,8 @@ namespace VoiceMaster.Backend
                 httpClient.BaseAddress = new Uri(Plugin.Configuration.Alltalk.BaseUrl);
                 httpClient.Timeout = TimeSpan.FromSeconds(5);
                 var uriBuilder = new UriBuilder(Plugin.Configuration.Alltalk.BaseUrl) { Path = Plugin.Configuration.Alltalk.VoicesPath };
-                var result = httpClient.GetStringAsync(uriBuilder.Uri);
-                result.Wait();
-                string resultStr = result.Result.Replace("\\", "");
+                var resultStr = await httpClient.GetStringAsync(uriBuilder.Uri).ConfigureAwait(false);
+                resultStr = resultStr.Replace("\\", "");
                 AlltalkVoices voices = System.Text.Json.JsonSerializer.Deserialize<AlltalkVoices>(resultStr);
 
                 foreach (string voice in voices.voices)

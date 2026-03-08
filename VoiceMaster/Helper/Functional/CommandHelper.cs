@@ -27,6 +27,10 @@ namespace VoiceMaster.Helper.Functional
         {
             Plugin.CommandManager.AddHandler("/vm", new CommandInfo(CommandHelper.OnCommand)
             {
+                HelpMessage = "Opens the configuration window"
+            });
+            Plugin.CommandManager.AddHandler("/vmtoggle", new CommandInfo(CommandHelper.OnCommand)
+            {
                 HelpMessage = "Toggles VoiceMaster"
             });
             Plugin.CommandManager.AddHandler("/vmtalk", new CommandInfo(CommandHelper.OnCommand)
@@ -114,6 +118,10 @@ namespace VoiceMaster.Helper.Functional
                     if (!Plugin.Configuration.FirstTime)
                         ToggleConfigUi();
                     break;
+                case "/vm":
+                    if (!Plugin.Configuration.FirstTime)
+                        ToggleConfigUi();
+                    break;
                 case "/ekid":
                     PrintTargetInfo();
                     break;
@@ -150,7 +158,7 @@ namespace VoiceMaster.Helper.Functional
                         errorText = $"Please enter a valid number or leave empty";
                     }
                     break;
-                case "/vm":
+                case "/vmtoggle":
                     Plugin.Configuration.Enabled = !Plugin.Configuration.Enabled;
                     Plugin.Configuration.Save();
                     
@@ -362,6 +370,7 @@ public static void PrintDebugInfo()
         {
             Plugin.CommandManager.RemoveHandler("/ek");
             Plugin.CommandManager.RemoveHandler("/vm");
+            Plugin.CommandManager.RemoveHandler("/vmtoggle");
             Plugin.CommandManager.RemoveHandler("/ekdb");
             Plugin.CommandManager.RemoveHandler("/ekid");
             Plugin.CommandManager.RemoveHandler("/vmtalk");

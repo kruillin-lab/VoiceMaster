@@ -14,6 +14,7 @@ public class Configuration : IPluginConfiguration
     public bool IsConfigWindowMovable { get; set; } = true;
     public TTSBackends BackendSelection { get; set; } = TTSBackends.Alltalk;
     public AlltalkData Alltalk { get; set; } = new AlltalkData();
+    public InworldAIData InworldAI { get; set; } = new InworldAIData();
     public List<NpcMapData> MappedNpcs { get; set; } = new List<NpcMapData>();
     public List<NpcMapData> MappedPlayers { get; set; } = new List<NpcMapData>();
     public List<uint> MutedNpcDialogues { get; set; } = new List<uint>();

@@ -20,6 +20,12 @@ public class SoundHelper : IDisposable
     // https://git.anna.lgbt/ascclemens/SoundFilter/src/commit/3b8512b4cd2f3ea0a0d162db4fa251ccb61f7dc4/SoundFilter/Filter.cs#L12
     private const string LoadSoundFileSig = "E8 ?? ?? ?? ?? 48 85 C0 75 05 40 B7 F6";
 
+    /// <summary>
+    /// Event triggered when a voice line is detected and loaded.
+    /// The string parameter contains the filename of the voice line.
+    /// </summary>
+    public event Action<string>? VoiceLineDetected;
+
     private const string PlaySpecificSoundSig =
         "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC 20 33 F6 8B DA 48 8B F9 0F BA E2 0F";
 
@@ -41,6 +47,59 @@ public class SoundHelper : IDisposable
     private static readonly Regex VoiceLineFileNameRegex = new(@"^cut/.*/(vo_|voice)");
     private static readonly Regex BattleVoiceLineFileNameRegex = new(@"^sound/.*/(Vo_Line)");
     private readonly HashSet<nint> knownVoiceLinePtrs = new();
+    
+    // Voice line collision avoidance: track active voice line playback
+    private static readonly HashSet<nint> activeVoiceLinePtrs = new();
+    private static readonly object voiceLineLock = new object();
+    
+    /// <summary>
+    /// Returns true if any game voice line is currently playing.
+    /// Used by TTS system to avoid overlapping with game audio.
+    /// </summary>
+    public static bool IsVoiceLinePlaying()
+    {
+        lock (voiceLineLock)
+        {
+            // Clean up any pointers that are no longer valid (disposed)
+            var toRemove = new List<nint>();
+            foreach (var ptr in activeVoiceLinePtrs)
+            {
+                try
+                {
+                    // Try to read a byte to check if memory is still accessible
+                    _ = Marshal.ReadByte(ptr);
+                }
+                catch
+                {
+                    toRemove.Add(ptr);
+                }
+            }
+            foreach (var ptr in toRemove)
+                activeVoiceLinePtrs.Remove(ptr);
+            
+            return activeVoiceLinePtrs.Count > 0;
+        }
+    }
+    
+    /// <summary>
+    /// Waits for any active voice lines to finish playing.
+    /// Returns true if waited, false if no voice lines were playing.
+    /// </summary>
+    public static bool WaitForVoiceLineToFinish(TimeSpan timeout)
+    {
+        var startTime = DateTime.UtcNow;
+        var didWait = false;
+        
+        while (IsVoiceLinePlaying())
+        {
+            didWait = true;
+            if (DateTime.UtcNow - startTime > timeout)
+                break;
+            Thread.Sleep(50);
+        }
+        
+        return didWait;
+    }
     private readonly Dictionary<nint, string> knownVoiceLinesMap = new();
     public SoundHelper()
     {
@@ -77,6 +136,11 @@ public class SoundHelper : IDisposable
     {
         loadSoundFileHook?.Dispose();
         playSpecificSoundHook?.Dispose();
+        
+        lock (voiceLineLock)
+        {
+            activeVoiceLinePtrs.Clear();
+        }
     }
 
     private nint LoadSoundFileDetour(nint resourceHandlePtr, uint arg2)
@@ -112,6 +176,7 @@ public class SoundHelper : IDisposable
                         LogHelper.Debug(MethodBase.GetCurrentMethod().Name, $"Discovered voice line at address {resourceDataPtr:x}", new EKEventId(0, TextSource.AddonTalk));
                         knownVoiceLinePtrs.Add(resourceDataPtr);
                         knownVoiceLinesMap.Add(resourceDataPtr, fileName);
+                        VoiceLineDetected?.Invoke(fileName);
                     }
                     else
                     {

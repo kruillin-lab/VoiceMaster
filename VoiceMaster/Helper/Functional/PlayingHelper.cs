@@ -2,6 +2,7 @@ using VoiceMaster.DataClasses;
 using VoiceMaster.Enums;
 using VoiceMaster.Helper.API;
 using VoiceMaster.Helper.Data;
+using VoiceMaster.Helper.Addons;
 using ManagedBass;
 using System;
 using System.Collections.Generic;
@@ -44,7 +45,9 @@ namespace VoiceMaster.Helper.Functional
 
         public static void Update3DFactors(float audibleRange)
         {
-            Bass.Set3DFactors(1, audibleRange, 1);
+            // audibleRange is a range/distance concept, not a rolloff factor.
+            // Using it as the global rolloff makes sources sound muffled/"underwater".
+            Bass.Set3DFactors(1, 1, 1);
             Bass.Apply3D();
             LogHelper.Info(MethodBase.GetCurrentMethod().Name, $"Updated 3D factors to: {audibleRange}", new EKEventId(0, TextSource.AddonBubble));
         }
@@ -107,6 +110,10 @@ namespace VoiceMaster.Helper.Functional
 
         static void WorkPlayingQueue()
         {
+            // Do not start a new stream while another is still playing.
+            // The audio engine is asynchronous; without this, dialogue sources can overlap.
+            if (Playing) return;
+
             if (PlayingQueue.Count > 0)
             {
                 var queueItem = PlayingQueue[0];
@@ -126,10 +133,23 @@ namespace VoiceMaster.Helper.Functional
 
         static void PlayAudio(VoiceMessage queueItem)
         {
-
             LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Playing next queue item", queueItem.EventId);
 
-            queueItem.StreamId = AudioEngine.PlayStream(queueItem.Stream, channels: 1, initialPosition: new Vector3D(5,0,2));
+            // Voice line collision avoidance: Check if a game voice line is playing
+            // and wait for it to finish before starting TTS
+            if (SoundHelper.IsVoiceLinePlaying())
+            {
+                LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Game voice line detected, waiting before playing TTS", queueItem.EventId);
+                var waited = SoundHelper.WaitForVoiceLineToFinish(TimeSpan.FromSeconds(5));
+                if (waited)
+                    LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Finished waiting for voice line to complete", queueItem.EventId);
+            }
+
+            // 3D positional audio is great for bubbles/overhead text, but it can make UI dialogue
+            // sound muffled/"underwater" on some setups and is more prone to choppy artifacts.
+            // For dialogue windows and most non-positional sources, play in 2D.
+            bool use3D = queueItem.Source == TextSource.AddonBubble;
+            queueItem.StreamId = AudioEngine.PlayStream(queueItem.Stream, channels: 1, use3D: use3D, initialPosition: new Vector3D(5,0,2));
             CurrentlyPlayingDictionary.Add(queueItem.StreamId, queueItem);
             
             if (queueItem.Source == TextSource.AddonTalk || queueItem.Source == TextSource.VoiceTest)
@@ -138,7 +158,8 @@ namespace VoiceMaster.Helper.Functional
             LogHelper.Debug(MethodBase.GetCurrentMethod().Name, $"Audio volume: {queueItem.Volume}", queueItem.EventId);
             AudioEngine.SetVolume(queueItem.StreamId, queueItem.Volume);
             
-            AudioEngine.SetSourcePoller(queueItem.StreamId, () => new Vector3D(queueItem.SpeakerFollowObj?.Position.X ?? 0, queueItem.SpeakerFollowObj?.Position.Y ?? 0, queueItem.SpeakerFollowObj?.Position.Z ?? 0));
+            if (use3D)
+                AudioEngine.SetSourcePoller(queueItem.StreamId, () => new Vector3D(queueItem.SpeakerFollowObj?.Position.X ?? 0, queueItem.SpeakerFollowObj?.Position.Y ?? 0, queueItem.SpeakerFollowObj?.Position.Z ?? 0));
             Plugin.LipSyncHelper.TryLipSync(queueItem);
             LogHelper.Info(MethodBase.GetCurrentMethod().Name, $"Lipsyncdata text: {queueItem.Speaker.Name}",
                            queueItem.EventId);
@@ -163,6 +184,13 @@ namespace VoiceMaster.Helper.Functional
 
                     await BackendHelper.GenerateVoice(queueItem);
                 }
+                else
+                {
+                    LogHelper.Error(MethodBase.GetCurrentMethod().Name, $"Backend not ready: {response}. Skipping audio generation for: {queueItem.Text}",
+                                    queueItem.EventId);
+                    // Remove the item to prevent infinite loop
+                    RequestingQueue.RemoveAt(0);
+                }
             }
 
             return true;
@@ -184,6 +212,13 @@ namespace VoiceMaster.Helper.Functional
                     AddRequestedToQueue(queueItem);
 
                     await BackendHelper.GenerateVoice(queueItem);
+                }
+                else
+                {
+                    LogHelper.Error(MethodBase.GetCurrentMethod().Name, $"Backend not ready: {response}. Skipping audio generation for: {queueItem.Text}",
+                                    queueItem.EventId);
+                    // Remove the item to prevent infinite loop
+                    RequestingBubbleQueue.RemoveAt(0);
                 }
             }
 

@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Interface.Windowing;
 using VoiceMaster.DataClasses;
 using VoiceMaster.Enums;
 using System.Linq;
 using Dalamud.Interface;
+using Dalamud.Game.ClientState.Objects.Enums;
 using System.Reflection;
 using System.IO;
 using Dalamud.Bindings.ImGui;
@@ -15,6 +15,7 @@ using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
+using VoiceMaster.Backend;
 using VoiceMaster.Helper.API;
 using VoiceMaster.Helper.Data;
 using VoiceMaster.Helper.Functional;
@@ -48,6 +49,8 @@ public class ConfigWindow : Window, IDisposable
     private string _addPlayerName = "";
     private int _addPlayerWorldIndex = 0;
     private int _addPlayerVoiceIndex = 0;
+    private int _addPlayerRaceIndex = 0;
+    private int _addPlayerGenderIndex = 0;
 
     private string filterVoicePlayers = "";
     private List<NpcMapData> filteredBubbles = [];
@@ -538,6 +541,124 @@ public class ConfigWindow : Window, IDisposable
 
         if (Plugin.Configuration.BackendSelection == TTSBackends.Alltalk)
             AlltalkInstanceWindow.DrawAlltalk(false);
+        else if (Plugin.Configuration.BackendSelection == TTSBackends.InworldAI)
+            DrawInworldAISettings();
+    }
+
+    private void DrawInworldAISettings()
+    {
+        var enabled = Plugin.Configuration!.InworldAI.Enabled;
+        if (ImGui.Checkbox("Enable InworldAI Backend", ref enabled))
+        {
+            Plugin.Configuration.InworldAI.Enabled = enabled;
+            Plugin.Configuration.Save();
+        }
+
+        ImGui.Spacing();
+        var apiKey = Plugin.Configuration!.InworldAI.ApiKey;
+        if (ImGui.InputText("API Key", ref apiKey, 100))
+        {
+            Plugin.Configuration.InworldAI.ApiKey = apiKey;
+            Plugin.Configuration.Save();
+        }
+
+        var apiSecret = Plugin.Configuration!.InworldAI.ApiSecret;
+        if (ImGui.InputText("API Secret", ref apiSecret, 100))
+        {
+            Plugin.Configuration.InworldAI.ApiSecret = apiSecret;
+            Plugin.Configuration.Save();
+        }
+
+        // Base64 credential paste helper
+        ImGui.Spacing();
+        var base64Creds = "";
+        if (ImGui.InputText("Paste Base64 Credentials (Optional)", ref base64Creds, 200, ImGuiInputTextFlags.EnterReturnsTrue))
+        {
+            try
+            {
+                var decoded = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(base64Creds.Trim()));
+                var parts = decoded.Split(':', 2);
+                if (parts.Length == 2)
+                {
+                    Plugin.Configuration.InworldAI.ApiKey = parts[0];
+                    Plugin.Configuration.InworldAI.ApiSecret = parts[1];
+                    Plugin.Configuration.Save();
+                    LogHelper.Info(MethodBase.GetCurrentMethod().Name, "InworldAI credentials parsed from base64", new EKEventId(0, TextSource.None));
+                }
+                else
+                {
+                    LogHelper.Error(MethodBase.GetCurrentMethod().Name, "Invalid base64 format. Expected 'key:secret'", new EKEventId(0, TextSource.None));
+                }
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Error(MethodBase.GetCurrentMethod().Name, $"Failed to parse base64: {ex.Message}", new EKEventId(0, TextSource.None));
+            }
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Paste a base64-encoded 'key:secret' string here to auto-fill API Key and Secret");
+        }
+        ImGui.Spacing();
+
+        var workspaceId = Plugin.Configuration!.InworldAI.WorkspaceId;
+        if (ImGui.InputText("Workspace ID", ref workspaceId, 100))
+        {
+            Plugin.Configuration.InworldAI.WorkspaceId = workspaceId;
+            Plugin.Configuration.Save();
+        }
+
+        // Dropdown for Default Voice (Inworld TTS)
+        var currentVoiceId = Plugin.Configuration.InworldAI.CharacterId;
+        
+        // Use the loaded voices list (VoiceMasterVoices) which are populated from GetAvailableVoices
+        // Filter out "workspaces" ones if we are in TTS mode, or keep everything
+        var availableVoices = Plugin.Configuration.VoiceMasterVoices
+            .Select(v => v.BackendVoice)
+            .ToList();
+
+        if (availableVoices.Count > 0)
+        {
+            // If the current ID isn't in the list (e.g. it was manually typed or old), add it temporarily so it shows up
+            if (!availableVoices.Contains(currentVoiceId) && !string.IsNullOrEmpty(currentVoiceId))
+            {
+                availableVoices.Insert(0, currentVoiceId);
+            }
+
+            var currentIndex = availableVoices.IndexOf(currentVoiceId);
+            if (currentIndex == -1) currentIndex = 0;
+
+            if (ImGui.Combo("Default Voice", ref currentIndex, availableVoices.ToArray(), availableVoices.Count))
+            {
+                Plugin.Configuration.InworldAI.CharacterId = availableVoices[currentIndex];
+                Plugin.Configuration.Save();
+            }
+        }
+        else
+        {
+             if (ImGui.InputText("Default Voice ID", ref currentVoiceId, 100))
+            {
+                Plugin.Configuration.InworldAI.CharacterId = currentVoiceId;
+                Plugin.Configuration.Save();
+            }
+        }
+        
+        ImGui.TextWrapped("Note: Inworld TTS now uses voice display names in the UI and resolves them internally.");
+        ImGui.TextWrapped("If the dropdown is empty, switch backend to 'Alltalk' and back to 'InworldAI' to refresh voices.");
+
+        ImGui.Spacing();
+        if (ImGui.Button("Test Connection"))
+        {
+            Task.Run(async () =>
+            {
+                var backend = new InworldAIBackend();
+                var result = await backend.CheckReady(new EKEventId(0, TextSource.None));
+                if (result == "Ready")
+                    LogHelper.Info(MethodBase.GetCurrentMethod().Name, "InworldAI connection test: SUCCESS", new EKEventId(0, TextSource.None));
+                else
+                    LogHelper.Error(MethodBase.GetCurrentMethod().Name, $"InworldAI connection test: FAILED - {result}", new EKEventId(0, TextSource.None));
+            });
+        }
     }
 
     private void DrawSaveSettings()
@@ -804,8 +925,8 @@ public class ConfigWindow : Window, IDisposable
                     {
                         // Manual add player mapping (Name + HomeWorld)
                         ImGui.Separator();
-            ImGui.TextUnformatted("Add Player");
-ImGui.SetNextItemWidth(220f);
+                        ImGui.TextUnformatted("Add Player");
+                        ImGui.SetNextItemWidth(220f);
                         ImGui.InputText("Name##EKAddPlayerName", ref _addPlayerName, 64);
 
                         var worldNames = VoiceMaster.Helper.DataHelper.LuminaHelper.GetWorldNames();
@@ -815,6 +936,21 @@ ImGui.SetNextItemWidth(220f);
                         ImGui.SetNextItemWidth(220f);
                         var worldArr = worldNames.ToArray();
                         ImGui.Combo("World##EKAddPlayerWorld", ref _addPlayerWorldIndex, worldArr, worldArr.Length);
+
+                        // Race / Gender (players) - keep it simple: playable races only, and genders.
+                        var playableRaceNames = new[] { "Unknown", "Hyur", "Elezen", "Miqote", "Roegadyn", "Lalafell", "Viera", "AuRa", "Hrothgar" };
+                        if (_addPlayerRaceIndex < 0 || _addPlayerRaceIndex >= playableRaceNames.Length)
+                            _addPlayerRaceIndex = 0;
+                        ImGui.SameLine();
+                        ImGui.SetNextItemWidth(160f);
+                        ImGui.Combo("Race##EKAddPlayerRace", ref _addPlayerRaceIndex, playableRaceNames, playableRaceNames.Length);
+
+                        var genderNames = new[] { "None", "Male", "Female" };
+                        if (_addPlayerGenderIndex < 0 || _addPlayerGenderIndex >= genderNames.Length)
+                            _addPlayerGenderIndex = 0;
+                        ImGui.SameLine();
+                        ImGui.SetNextItemWidth(120f);
+                        ImGui.Combo("Gender##EKAddPlayerGender", ref _addPlayerGenderIndex, genderNames, genderNames.Length);
 
                         var voiceArrAdd = Plugin.Configuration!.VoiceMasterVoices.ConvertAll(p => p.ToString()).ToArray();
                         if (_addPlayerVoiceIndex < 0 || _addPlayerVoiceIndex >= voiceArrAdd.Length)
@@ -859,6 +995,8 @@ ImGui.SetNextItemWidth(220f);
                                     existing.ObjectKind = ObjectKind.Player;
                                     existing.Name = name;
                                     existing.HomeWorld = homeWorld;
+                                    existing.Gender = _addPlayerGenderIndex == 1 ? Genders.Male : (_addPlayerGenderIndex == 2 ? Genders.Female : Genders.None);
+                                    existing.Race = Enum.TryParse<NpcRaces>(playableRaceNames[_addPlayerRaceIndex], out var parsedRace2) ? parsedRace2 : NpcRaces.Unknown;
                                     existing.RefreshSelectable();
                                 }
                                 else
@@ -868,8 +1006,8 @@ ImGui.SetNextItemWidth(220f);
                                         Name = name,
                                         HomeWorld = homeWorld,
                                         ObjectKind = ObjectKind.Player,
-                                        Gender = Genders.None,
-                                        Race = NpcRaces.Unknown,
+                                        Gender = _addPlayerGenderIndex == 1 ? Genders.Male : (_addPlayerGenderIndex == 2 ? Genders.Female : Genders.None),
+                                        Race = Enum.TryParse<NpcRaces>(playableRaceNames[_addPlayerRaceIndex], out var parsedRace) ? parsedRace : NpcRaces.Unknown,
                                         RaceStr = string.Empty,
                                         IsChild = false,
                                         IsEnabled = true,
@@ -948,7 +1086,7 @@ ImGui.SetNextItemWidth(220f);
         {
             using var table = ImRaii.Table("Voice Table##VoiceTable", 9,
                                            ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.RowBg |
-                                           ImGuiTableFlags.Sortable | ImGuiTableFlags.ScrollX |
+                                           ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable | ImGuiTableFlags.ScrollX |
                                            ImGuiTableFlags.ScrollY);
             if (table)
             {
@@ -1266,7 +1404,7 @@ ImGui.SetNextItemWidth(220f);
 
         var isPlayersTable = dataType == "Players";
 
-        using var table = ImRaii.Table($"{dataType} Table##{dataType}Table", isPlayersTable ? 12 : 11, ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.RowBg | ImGuiTableFlags.Sortable | ImGuiTableFlags.ScrollX | ImGuiTableFlags.ScrollY);
+        using var table = ImRaii.Table($"{dataType} Table##{dataType}Table", isPlayersTable ? 12 : 11, ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.RowBg | ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable | ImGuiTableFlags.ScrollX | ImGuiTableFlags.ScrollY);
         if (table)
         {
             ImGui.TableSetupScrollFreeze(0, 2); // Make top row always visible
@@ -1638,7 +1776,7 @@ ImGui.SetNextItemWidth(220f);
                 updatePhonData = true;
                 resetPhonFilter = false;
             }
-            using var table = ImRaii.Table("Phonetics Table##NPCTable", 3, ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.RowBg | ImGuiTableFlags.Sortable | ImGuiTableFlags.ScrollX | ImGuiTableFlags.ScrollY);
+            using var table = ImRaii.Table("Phonetics Table##NPCTable", 3, ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.RowBg | ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable | ImGuiTableFlags.ScrollX | ImGuiTableFlags.ScrollY);
             if (table)
             {
                 ImGui.TableSetupScrollFreeze(0, 3); // Make top row always visible
@@ -2080,7 +2218,7 @@ ImGui.SetNextItemWidth(220f);
 
             using (var table = ImRaii.Table($"Log Table##{logType}LogTable", 4,
                                             ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.RowBg |
-                                            ImGuiTableFlags.Sortable | ImGuiTableFlags.ScrollY))
+                                            ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable | ImGuiTableFlags.ScrollY))
             {
                 if (table)
                 {

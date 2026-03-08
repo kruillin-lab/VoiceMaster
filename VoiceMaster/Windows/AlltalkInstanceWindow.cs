@@ -421,7 +421,7 @@ public class AlltalkInstanceWindow : Window, IDisposable
     {
         try
         {
-            if (BackendHelper.ReloadService(reloadModel, new EKEventId(0, TextSource.None)))
+            if (await BackendHelper.ReloadService(reloadModel, new EKEventId(0, TextSource.None)))
                 testConnectionRes = "Successfully started service reload. Please wait for up to 30 seconds before using.";
             else
                 testConnectionRes = "Error while service reload. Please check logs.";

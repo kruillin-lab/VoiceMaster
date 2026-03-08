@@ -1,6 +1,7 @@
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
+using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Plugin.Services;
 using VoiceMaster.DataClasses;
 using VoiceMaster.Enums;
@@ -49,6 +50,20 @@ namespace VoiceMaster.Helper.Addons
                 var (type, sender, message) = chatMessage;
                 var text = message.TextValue;
                 var realSender = TalkTextHelper.StripWorldFromNames(sender);
+
+                // B+ player identity: keep HomeWorld for cross-world / out-of-zone players so mappings are stable.
+                // We still use the stripped sender for object-table lookup, but we pass Name@World into Say() when no speaker object is available.
+                var senderWorld = "";
+                foreach (var payload in sender.Payloads)
+                {
+                    if (payload is PlayerPayload pp)
+                    {
+                        senderWorld = pp.World.Value.Name.ToString();
+                        break;
+                    }
+                }
+
+                var senderKey = !string.IsNullOrWhiteSpace(senderWorld) ? $"{realSender}@{senderWorld}" : realSender;
                 text = TalkTextHelper.NormalizePunctuation(text);
 
                 switch ((ushort)type)
@@ -143,7 +158,8 @@ namespace VoiceMaster.Helper.Addons
 
                 if (!Plugin.Configuration.VoiceChatPlayer && DalamudHelper.LocalPlayer != null && DalamudHelper.LocalPlayer.Name.TextValue == realSender) return;
 
-                Plugin.Say(eventId, speaker ?? null, speaker?.Name ?? "", text);
+                var resolvedSpeakerName = speaker != null ? speaker.Name.TextValue : senderKey;
+                Plugin.Say(eventId, speaker, resolvedSpeakerName, text);
             }
             catch (Exception ex)
             {

@@ -8,6 +8,7 @@ namespace VoiceMaster.Enums
 {
     public enum TTSBackends
     {
-        Alltalk
+        Alltalk,
+        InworldAI
     }
 }

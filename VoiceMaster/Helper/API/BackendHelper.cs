@@ -27,7 +27,7 @@ namespace VoiceMaster.Helper.API
             PlayingHelper.Setup();
         }
 
-        public static void SetBackendType(TTSBackends backendType)
+        public static async void SetBackendType(TTSBackends backendType)
         {
             if (backendType == TTSBackends.Alltalk)
             {
@@ -37,14 +37,40 @@ namespace VoiceMaster.Helper.API
                     LogHelper.Info(MethodBase.GetCurrentMethod().Name, $"Creating backend instance: {backendType}",
                                    new EKEventId(0, TextSource.None));
                     Backend = new AlltalkBackend();
-                    GetAndMapVoices(new EKEventId(0, TextSource.None));
+                    await GetAndMapVoices(new EKEventId(0, TextSource.None));
                 }
+                else
+                {
+                    LogHelper.Error(MethodBase.GetCurrentMethod().Name, "Alltalk selected but no instance configured (Remote or Local must be enabled)",
+                                    new EKEventId(0, TextSource.None));
+                }
+            }
+            else if (backendType == TTSBackends.InworldAI)
+            {
+                if (!Plugin.Configuration.InworldAI.Enabled)
+                {
+                    LogHelper.Error(MethodBase.GetCurrentMethod().Name, "InworldAI selected but not enabled in configuration",
+                                    new EKEventId(0, TextSource.None));
+                    return;
+                }
+                if (string.IsNullOrWhiteSpace(Plugin.Configuration.InworldAI.ApiKey) ||
+                    string.IsNullOrWhiteSpace(Plugin.Configuration.InworldAI.ApiSecret))
+                {
+                    LogHelper.Error(MethodBase.GetCurrentMethod().Name, "InworldAI selected but API Key or Secret is missing",
+                                    new EKEventId(0, TextSource.None));
+                    return;
+                }
+
+                LogHelper.Info(MethodBase.GetCurrentMethod().Name, $"Creating backend instance: {backendType}",
+                               new EKEventId(0, TextSource.None));
+                Backend = new InworldAIBackend();
+                await GetAndMapVoices(new EKEventId(0, TextSource.None));
             }
         }
 
-        public static bool ReloadService(string reloadModel, EKEventId eventId)
+        public static async Task<bool> ReloadService(string reloadModel, EKEventId eventId)
         {
-            return Backend.ReloadService(reloadModel, eventId).Result;
+            return await Backend.ReloadService(reloadModel, eventId).ConfigureAwait(false);
         }
 
         public static bool IsBackendAvailable()
@@ -60,9 +86,37 @@ namespace VoiceMaster.Helper.API
                         !string.IsNullOrWhiteSpace(Plugin.Configuration.Alltalk.BaseUrl))
                         return true;
                     break;
+                case TTSBackends.InworldAI:
+                    // Basic check if configured
+                    if (!string.IsNullOrEmpty(Plugin.Configuration.InworldAI.ApiKey) &&
+                        !string.IsNullOrEmpty(Plugin.Configuration.InworldAI.ApiSecret))
+                        return true;
+                    break;
             }
 
             return false;
+        }
+
+        // Pre-filter to skip non-speech text (ASCII art, emoticons, mostly punctuation)
+        static bool IsSpeakableText(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+
+            // Count letters vs non-letters
+            int letterCount = 0;
+            int nonLetterCount = 0;
+
+            foreach (char c in text)
+            {
+                if (char.IsLetter(c))
+                    letterCount++;
+                else if (!char.IsWhiteSpace(c))
+                    nonLetterCount++;
+            }
+
+            // Require at least some letters, and letters should be majority
+            return letterCount > 0 && letterCount >= nonLetterCount;
         }
 
         public static void OnSay(VoiceMessage voiceMessage)
@@ -70,6 +124,13 @@ namespace VoiceMaster.Helper.API
             var eventId = voiceMessage.EventId;
             LogHelper.Info(MethodBase.GetCurrentMethod().Name, $"Starting voice inference: {voiceMessage.Language}", eventId);
             LogHelper.Info(MethodBase.GetCurrentMethod().Name, voiceMessage.Text.ToString(), eventId);
+
+            // Skip non-speech text (ASCII art, emoticons, etc.)
+            if (!IsSpeakableText(voiceMessage.Text))
+            {
+                LogHelper.Debug(MethodBase.GetCurrentMethod().Name, $"Skipping non-speech text: {voiceMessage.Text}", eventId);
+                return;
+            }
 
             // Optional: suppress NPCs that are already voiced by the game (user-maintained ignore list)
             // Applies only to NPC-facing sources (not chat/bubble).
@@ -165,10 +226,21 @@ namespace VoiceMaster.Helper.API
             PlayingHelper.ResumePlaying(message);
         }
 
-        static void GetAndMapVoices(EKEventId eventId)
+        static async Task GetAndMapVoices(EKEventId eventId)
         {
             LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Loading and mapping voices", eventId);
-            var backendVoices = Backend.GetAvailableVoices(eventId);
+            var backendVoices = await Backend.GetAvailableVoices(eventId);
+
+            
+            // Guard: if the backend returns no voices (backend offline / endpoint misconfigured / transient failure),
+            // do NOT mutate or save the local voice list. Wiping VoiceMasterVoices here causes user mappings to "disappear".
+            if (backendVoices == null || backendVoices.Count == 0)
+            {
+                LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Backend returned 0 voices; keeping existing configured voices.", eventId);
+                NpcDataHelper.RefreshSelectables(Plugin.Configuration.VoiceMasterVoices);
+                ConfigWindow.UpdateDataVoices = true;
+                return;
+            }
 
             var newVoices = backendVoices.FindAll(p => Plugin.Configuration.VoiceMasterVoices.Find(f => f.BackendVoice == p) == null);
 
@@ -292,10 +364,18 @@ namespace VoiceMaster.Helper.API
                         i++;
                     }
                 
-                    message.Stream = responseStream;
-                    PlayingHelper.PlayingQueue.Add(message);
-
-                    return true;
+                    if (responseStream != null)
+                    {
+                        message.Stream = responseStream;
+                        PlayingHelper.PlayingQueue.Add(message);
+                        return true;
+                    }
+                    else
+                    {
+                        LogHelper.Info(MethodBase.GetCurrentMethod().Name, $"Failed to generate audio for: {message.Text}. Removing from queue.", eventId);
+                        PlayingHelper.RequestedQueue.Remove(message);
+                        return false;
+                    }
                 }
             }
             catch (Exception ex)
