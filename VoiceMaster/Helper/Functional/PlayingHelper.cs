@@ -252,24 +252,27 @@ namespace VoiceMaster.Helper.Functional
                         }
                     }
 
-                    if (Plugin.Configuration.SaveToLocal && Directory.Exists(Plugin.Configuration.LocalSaveLocation))
+                    if (Plugin.Configuration.SaveToLocal)
                     {
-                        var playedText = currentlyPlayingMessage;
-                        LogHelper.Debug(MethodBase.GetCurrentMethod().Name, $"Text: {playedText.Text}", eventId);
-                        if (!string.IsNullOrWhiteSpace(playedText.Text) &&
-                            !playedText.LoadedLocally)
+                        if (Directory.Exists(Plugin.Configuration.LocalSaveLocation))
                         {
-                            var filePath =
-                                AudioFileHelper.GetLocalAudioPath(Plugin.Configuration.LocalSaveLocation, playedText);
-                            var stream = currentlyPlayingMessage.Stream;
-                            AudioFileHelper.WriteStreamToFile(eventId, filePath, stream);
+                            var playedText = currentlyPlayingMessage;
+                            LogHelper.Debug(MethodBase.GetCurrentMethod().Name, $"Text: {playedText.Text}", eventId);
+                            if (!string.IsNullOrWhiteSpace(playedText.Text) &&
+                                !playedText.LoadedLocally)
+                            {
+                                var filePath =
+                                    AudioFileHelper.GetLocalAudioPath(Plugin.Configuration.LocalSaveLocation, playedText);
+                                var stream = currentlyPlayingMessage.Stream;
+                                AudioFileHelper.WriteStreamToFile(eventId, filePath, stream);
+                            }
                         }
-                    }
-                    else
-                    {
-                        LogHelper.Error(MethodBase.GetCurrentMethod().Name,
-                                        $"Couldn't save file locally. Save location doesn't exists: {Plugin.Configuration.LocalSaveLocation}",
-                                        eventId);
+                        else
+                        {
+                            LogHelper.Error(MethodBase.GetCurrentMethod().Name,
+                                            $"Couldn't save file locally. Save location doesn't exist: {Plugin.Configuration.LocalSaveLocation}",
+                                            eventId);
+                        }
                     }
                     
                     currentlyPlayingMessage.Stream.Dispose();
