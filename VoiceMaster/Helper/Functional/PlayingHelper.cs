@@ -127,6 +127,7 @@ namespace VoiceMaster.Helper.Functional
                 {
                     LogHelper.Error(MethodBase.GetCurrentMethod().Name, $"Error while working queue: {ex}", queueItem.EventId);
                     AudioEngine.Stop(queueItem.StreamId);
+                    Playing = false; // Safety: ensure queue is never permanently locked by a PlayAudio exception
                 }
             }
         }
@@ -236,7 +237,20 @@ namespace VoiceMaster.Helper.Functional
                 {
                     if (Plugin.Configuration.CreateMissingLocalSaveLocation &&
                         !Directory.Exists(Plugin.Configuration.LocalSaveLocation))
-                        Directory.CreateDirectory(Plugin.Configuration.LocalSaveLocation);
+                    {
+                        try
+                        {
+                            Directory.CreateDirectory(Plugin.Configuration.LocalSaveLocation);
+                        }
+                        catch (Exception ex)
+                        {
+                            LogHelper.Warning(MethodBase.GetCurrentMethod().Name, 
+                                $"Failed to create directory '{Plugin.Configuration.LocalSaveLocation}': {ex.Message}. Disabling local save.", 
+                                eventId);
+                            Plugin.Configuration.SaveToLocal = false;
+                            Plugin.Configuration.CreateMissingLocalSaveLocation = false;
+                        }
+                    }
 
                     if (Plugin.Configuration.SaveToLocal && Directory.Exists(Plugin.Configuration.LocalSaveLocation))
                     {

@@ -536,7 +536,7 @@ public class ConfigWindow : Window, IDisposable
             Plugin.Configuration.Save();
             BackendHelper.SetBackendType(backendSelection);
 
-            LogHelper.Info(MethodBase.GetCurrentMethod()!.Name, $"Updated backendselection to: {Constants.BACKENDS[presetIndex]}", new EKEventId(0, TextSource.None));
+            LogHelper.Info(MethodBase.GetCurrentMethod()!.Name, $"Updated backendselection to: {backendSelection}", new EKEventId(0, TextSource.None));
         }
 
         if (Plugin.Configuration.BackendSelection == TTSBackends.Alltalk)
@@ -598,6 +598,17 @@ public class ConfigWindow : Window, IDisposable
         if (ImGui.IsItemHovered())
         {
             ImGui.SetTooltip("Paste a base64-encoded 'key:secret' string here to auto-fill API Key and Secret");
+        }
+        // Streaming toggle
+        var streamingEnabled = Plugin.Configuration!.InworldAI.StreamingEnabled;
+        if (ImGui.Checkbox("Enable Streaming TTS (lower latency)", ref streamingEnabled))
+        {
+            Plugin.Configuration.InworldAI.StreamingEnabled = streamingEnabled;
+            Plugin.Configuration.Save();
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("When enabled, audio starts playing immediately as it is generated.\nDisable if you experience audio glitches.");
         }
         ImGui.Spacing();
 

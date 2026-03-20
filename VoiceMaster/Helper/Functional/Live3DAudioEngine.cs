@@ -93,22 +93,47 @@ public sealed class Live3DAudioEngine : IDisposable
             => new Vector3D(a.Y*b.Z - a.Z*b.Y, a.Z*b.X - a.X*b.Z, a.X*b.Y - a.Y*b.X);
     }
 
-    unsafe void ListenerTick()
+    void ListenerTick()
     {
         if (!_inited) return;
+
+        // ClientState and game objects must be accessed on the framework/main thread.
+        // Snapshot the values we need there, then do the BASS work on this timer thread.
+        Plugin.Framework.RunOnFrameworkThread(ListenerTickOnFramework);
+    }
+
+    unsafe void ListenerTickOnFramework()
+    {
+        if (!_inited) return;
+
+        // Guard: no player object exists (title screen, disconnected, etc.)
+        if (!Plugin.ClientState.IsLoggedIn || Plugin.ClientState.LocalPlayer == null)
+        {
+            DalamudHelper.LocalPlayer = null;
+            return;
+        }
 
         if (DalamudHelper.Camera == null && CameraManager.Instance() != null)
             DalamudHelper.Camera = CameraManager.Instance()->GetActiveCamera();
 
-        if (DalamudHelper.LocalPlayer == null)
-            Plugin.Framework.RunOnFrameworkThread(() => DalamudHelper.LocalPlayer = Plugin.ClientState.LocalPlayer);
+        DalamudHelper.LocalPlayer = Plugin.ClientState.LocalPlayer;
 
         if (DalamudHelper.Camera != null && DalamudHelper.LocalPlayer != null)
         {
+            System.Numerics.Vector3 p;
+            try
+            {
+                p = DalamudHelper.LocalPlayer.Position;
+            }
+            catch
+            {
+                DalamudHelper.LocalPlayer = null;
+                return;
+            }
+
             var matrix = DalamudHelper.Camera->CameraBase.SceneCamera.ViewMatrix;
             _listenerFront = new Vector3D(matrix[2], matrix[1], matrix[0]);
 
-            var p = DalamudHelper.LocalPlayer.Position;
             var target = new Vector3D(p.X, p.Y, p.Z);
 
             var now = Stopwatch.GetTimestamp();
@@ -243,6 +268,7 @@ public sealed class Live3DAudioEngine : IDisposable
         Func<Vector3D>? _positionProvider;
         volatile Vector3D _srcPos;
         Vector3D _lastPos;
+        MemoryStream? _fastSource; // pre-loaded bytes for seekable (local file) sources
         long _lastTicks;
         Vector3D _smoothPos;
         const float _smoothHz = 20f;
@@ -340,8 +366,11 @@ public sealed class Live3DAudioEngine : IDisposable
                 Bass.ChannelSet3DAttributes(_h, ManagedBass.Mode3D.Normal, 1f, 0f, -1, -1, 0);
 
             // robuster Start: etwas größerer Channel-Buffer (>=450 ms)
-            var channelBufferMs = MathF.Max(_bufferMs, 450);
-            Bass.ChannelSetAttribute(_h, ChannelAttribute.Buffer, channelBufferMs / 1000f);
+            // For local (seekable) files we will size the buffer to hold the entire file
+            // so we can push everything before ChannelPlay with zero underrun risk.
+            // We compute this after the _fastSource copy below.
+            float channelBufferSec = MathF.Max(_bufferMs, 450) / 1000f; // will be updated for local files
+            // placeholder — set after _fastSource is built
 
             Bass.ChannelSetAttribute(_h, ChannelAttribute.Volume, 1f);
             if (_use3D)
@@ -355,20 +384,54 @@ public sealed class Live3DAudioEngine : IDisposable
             if (Bass.ChannelSetSync(_h, SyncFlags.End, 0, _endSync) == 0)
                 throw new InvalidOperationException($"ChannelSetSync(End) failed: {Bass.LastError}");
 
-            // IMPORTANT: Prime the push-stream with a little silence BEFORE starting the writer.
-            // If the source stream is already fully buffered (non-streaming generation), the writer
-            // can finish and signal StreamProcedureType.End extremely quickly. If that happens
-            // before we push the priming silence, ManagedBass will return BASS_ERROR_ENDED.
-            // Priming first avoids the race entirely.
-            PrimePushStreamSilence();
-
-            _reader = Task.Run(ReadLoop, _cts.Token);
-            _writer = Task.Run(WriteLoop, _cts.Token);
-
             _lastPos = _srcPos;
             _smoothPos = _srcPos;
             _lastTicks = Stopwatch.GetTimestamp();
-            PrebufferAndStartWithFadeIn(skipPrimingSilence: true);
+
+            // Prime with silence first to avoid start-up crackle.
+            PrimePushStreamSilence();
+
+            if (_source.CanSeek)
+            {
+                // Seekable = local file. Copy all PCM bytes into a MemoryStream,
+                // then size the BASS channel buffer to hold the entire file so we
+                // can push everything before ChannelPlay — zero underrun risk.
+                var ms = new MemoryStream((int)Math.Max(0, _source.Length - _source.Position));
+                _source.CopyTo(ms);
+                ms.Position = 0;
+                _fastSource = ms;
+
+                // Size channel buffer = full file duration + 200ms headroom.
+                long pcmBytes = ms.Length;
+                float fileDurationSec = pcmBytes / (float)(_sr * _bytesPerSampleOut * _ch);
+                channelBufferSec = fileDurationSec + 0.2f;
+            }
+
+            Bass.ChannelSetAttribute(_h, ChannelAttribute.Buffer, channelBufferSec);
+
+            _reader = Task.Run(ReadLoopInternal, _cts.Token);
+            _writer = Task.Run(WriteLoop, _cts.Token);
+
+            if (_fastSource != null)
+            {
+                // Local file: wait for reader+writer to finish pushing ALL data to BASS,
+                // then start playback. Buffer is sized to hold everything — no underrun possible.
+                _reader.Wait(_cts.Token);
+                _writer.Wait(_cts.Token);
+            }
+            else
+            {
+                // Live stream: use poll-based prebuffer wait for first network chunks.
+                PrebufferAndStartWithFadeIn(skipPrimingSilence: true);
+            }
+
+            if (!Bass.ChannelPlay(_h, false))
+                throw new InvalidOperationException($"ChannelPlay failed: {Bass.LastError}");
+
+            int rampMs = 120;
+            _rampTotalSamples = Math.Max(1, _sr * rampMs / 1000 * _ch);
+            _rampSamplesLeft  = _rampTotalSamples;
+
             SetState(PlaybackState.Playing);
             _engine.VoiceLineStarted?.Invoke(_id);
         }
@@ -390,32 +453,26 @@ public sealed class Live3DAudioEngine : IDisposable
 
             if (!skipPrimingSilence)
             {
-                // Fallback path (should normally be skipped because we prime in Start()).
                 int silenceMs = 90;
                 int silenceBytes = Math.Max(frameOut, _sr * frameOut * silenceMs / 1000);
                 PushSilence(silenceBytes);
             }
 
-            // 2) Auf ausreichend Material warten (>= 320 ms)
-            int targetMs   = 650;
+            // For local files (_fastSource set), the reader task drains a MemoryStream —
+            // it completes nearly instantly. Use a short target and tight timeout.
+            // For live HTTP streams, wait longer for the first network chunks.
+            bool isFast = _fastSource != null;
+            int targetMs  = isFast ? 80 : 300;
+            int timeoutMs = isFast ? 300 : 800;
             int targetByte = Math.Max(frameOut, _sr * frameOut * targetMs / 1000);
 
             var sw = Stopwatch.StartNew();
-            while (sw.ElapsedMilliseconds < 2000)
+            while (sw.ElapsedMilliseconds < timeoutMs)
             {
                 int avail = Bass.ChannelGetData(_h, IntPtr.Zero, (int)DataFlags.Available);
                 if (avail >= targetByte) break;
-                Thread.Sleep(5);
+                Thread.Sleep(2);
             }
-
-            // 3) Jetzt starten
-            if (!Bass.ChannelPlay(_h, false))
-                throw new InvalidOperationException($"ChannelPlay failed: {Bass.LastError}");
-
-            // 4) Mehr-Chunk-Fade-In im DSP (z. B. 40 ms)
-            int rampMs = 120;
-            _rampTotalSamples = Math.Max(1, _sr * rampMs / 1000 * _ch);
-            _rampSamplesLeft  = _rampTotalSamples;
         }
 
         void PushSilence(int bytes)
@@ -605,6 +662,7 @@ public sealed class Live3DAudioEngine : IDisposable
                 try { if (h != 0) Bass.StreamFree(h); } catch { }
 
                 try { _cts.Dispose(); } catch { }
+                try { _fastSource?.Dispose(); _fastSource = null; } catch { }
                 if (!leaveOpen)
                 {
                     try { src.Dispose(); } catch { }
@@ -622,6 +680,7 @@ public sealed class Live3DAudioEngine : IDisposable
             if (_h != 0) { try { Bass.StreamFree(_h); } catch { } _h = 0; }
             _cts.Cancel();
             _cts.Dispose();
+            try { _fastSource?.Dispose(); _fastSource = null; } catch { }
             if (!_leaveOpen) _source.Dispose();
         }
 
@@ -670,7 +729,19 @@ public sealed class Live3DAudioEngine : IDisposable
             }
         }
 
+        // Selects the right source stream and delegates to ReadLoop.
+        // For local files, _fastSource (MemoryStream) is used instead of _source.
+        async Task ReadLoopInternal()
+        {
+            await ReadLoopFrom(_fastSource ?? _source).ConfigureAwait(false);
+        }
+
         async Task ReadLoop()
+        {
+            await ReadLoopFrom(_source).ConfigureAwait(false);
+        }
+
+        async Task ReadLoopFrom(Stream source)
         {
             try
             {
@@ -688,10 +759,10 @@ public sealed class Live3DAudioEngine : IDisposable
 
                 while (!_cts.IsCancellationRequested)
                 {
-                    int n = await _source.ReadAsync(buf.AsMemory(0, buf.Length), _cts.Token).ConfigureAwait(false);
+                    int n = await source.ReadAsync(buf.AsMemory(0, buf.Length), _cts.Token).ConfigureAwait(false);
                     if (n <= 0) break;
 
-                    if (_autoDetectWav && !_headerChecked && !_source.CanSeek)
+                    if (_autoDetectWav && !_headerChecked && !source.CanSeek)
                         _headerChecked = true;
 
                     carry.Write(buf, 0, n);
