@@ -254,8 +254,13 @@ namespace VoiceMaster.Helper.Functional
 
                     if (Plugin.Configuration.SaveToLocal)
                     {
-                        if (Directory.Exists(Plugin.Configuration.LocalSaveLocation))
+                        try
                         {
+                            if (!Directory.Exists(Plugin.Configuration.LocalSaveLocation))
+                            {
+                                Directory.CreateDirectory(Plugin.Configuration.LocalSaveLocation);
+                            }
+
                             var playedText = currentlyPlayingMessage;
                             LogHelper.Debug(MethodBase.GetCurrentMethod().Name, $"Text: {playedText.Text}", eventId);
                             if (!string.IsNullOrWhiteSpace(playedText.Text) &&
@@ -267,10 +272,10 @@ namespace VoiceMaster.Helper.Functional
                                 AudioFileHelper.WriteStreamToFile(eventId, filePath, stream);
                             }
                         }
-                        else
+                        catch (Exception ex)
                         {
                             LogHelper.Error(MethodBase.GetCurrentMethod().Name,
-                                            $"Couldn't save file locally. Save location doesn't exist: {Plugin.Configuration.LocalSaveLocation}",
+                                            $"Couldn't save file locally to {Plugin.Configuration.LocalSaveLocation}. Error: {ex.Message}",
                                             eventId);
                         }
                     }
