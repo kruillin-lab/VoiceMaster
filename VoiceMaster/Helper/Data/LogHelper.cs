@@ -87,6 +87,14 @@ namespace VoiceMaster.Helper.Data
             Log.Error($"{method} - {text} - ID: {eventId.Id}");
         }
 
+        public static void Warning(string method, string text, EKEventId eventId)
+        {
+            text = $"{text}";
+            SortLogEntry(new LogMessage() { type = LogType.Warning, eventId = eventId, method = method, message = $"{text}", color = Constants.WARNINGLOGCOLOR, timeStamp = DateTime.Now });
+
+            Log.Warning($"{method} - {text} - ID: {eventId.Id}");
+        }
+
         private static void SortLogEntry(LogMessage logMessage)
         {
             switch (logMessage.eventId.textSource)

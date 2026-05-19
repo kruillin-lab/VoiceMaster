@@ -19,6 +19,8 @@ using VoiceMaster.Helper.DataHelper;
 using VoiceMaster.Helper.API;
 using VoiceMaster.Helper.Data;
 using VoiceMaster.Helper.Functional;
+using VoiceMaster.Services;
+using VoiceMaster.Services.Queue;
 using FFXIVClientStructs.FFXIV.Client.UI.Misc;
 using System.Threading.Tasks;
 
@@ -58,6 +60,13 @@ public partial class Plugin : IDalamudPlugin
     internal static ChatTalkHelper ChatTalkHelper{ get; private set; } = null!;
 
     public readonly WindowSystem WindowSystem = new("VoiceMaster");
+
+    // --- New Echokraut Integration Services ---
+    internal static ServiceContainer? ServiceContainer { get; private set; }
+    internal static IVoiceMessageQueue? VoiceMessageQueue { get; private set; }
+    internal static BackendService? BackendService { get; private set; }
+    internal static AudioPlaybackService? AudioPlaybackService { get; private set; }
+    internal static VoiceMessageProcessor? VoiceMessageProcessor { get; private set; }
 
     
 
@@ -158,6 +167,9 @@ public Plugin(
         ChatTalkHelper = new ChatTalkHelper();
         SoundHelper = new SoundHelper();
 
+        // --- Initialize new Echokraut Integration Services ---
+        InitializeServices();
+
         WindowSystem.AddWindow(ConfigWindow);
         WindowSystem.AddWindow(AlltalkInstanceWindow);
         WindowSystem.AddWindow(FirstTimeWindow);
@@ -169,12 +181,20 @@ public Plugin(
         // to toggle the display status of the configuration ui
         PluginInterface.UiBuilder.OpenConfigUi += CommandHelper.ToggleConfigUi;
         ClientState.Login += OnLogin;
+        ClientState.Logout += OnLogout;
 
         if (Configuration.FirstTime && !FirstTimeWindow.IsOpen && ClientState.IsLoggedIn)
             CommandHelper.ToggleFirstTimeUi();
 
         if (!Configuration.FirstTime && ClientState.IsLoggedIn && Configuration.Alltalk.LocalInstall && Configuration.Alltalk.LocalInstance && Configuration.Alltalk.AutoStartLocalInstance)
             AlltalkInstanceHelper.StartInstance();
+    }
+
+    private void OnLogout(int type, int code)
+    {
+        // Clear cached player reference immediately so Live3DAudioEngine.ListenerTick()
+        // doesn't try to access a destroyed game object on the title screen.
+        DalamudHelper.LocalPlayer = null;
     }
 
     private void OnLogin()
@@ -190,6 +210,42 @@ public Plugin(
         catch (Exception e)
         {
             LogHelper.Error(MethodBase.GetCurrentMethod().Name, $"Error while starting voice inference: {e}", new EKEventId(0, TextSource.None));
+        }
+    }
+
+    /// <summary>
+    /// Initialize new Echokraut Integration Services
+    /// </summary>
+    private void InitializeServices()
+    {
+        try
+        {
+            Log.Info("Initializing Echokraut Integration Services");
+            
+            // Create service container
+            ServiceContainer = new ServiceContainer();
+            
+            // Register queue
+            VoiceMessageQueue = new VoiceMessageQueue();
+            ServiceContainer.RegisterSingleton<IVoiceMessageQueue>(VoiceMessageQueue);
+            
+            // Register backend service
+            BackendService = new BackendService(VoiceMessageQueue, Log, Configuration);
+            ServiceContainer.RegisterSingleton(BackendService);
+            
+            // Register audio playback service (using existing LipSyncHelper as interface)
+            AudioPlaybackService = new AudioPlaybackService(VoiceMessageQueue, Log, Configuration, Framework, new LipSyncHelperWrapper(LipSyncHelper));
+            ServiceContainer.RegisterSingleton(AudioPlaybackService);
+            
+            // Register voice message processor
+            VoiceMessageProcessor = new VoiceMessageProcessor(Log, BackendService, Configuration, ClientState);
+            ServiceContainer.RegisterSingleton(VoiceMessageProcessor);
+            
+            Log.Info("Echokraut Integration Services initialized successfully");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to initialize Echokraut Integration Services");
         }
     }
 
@@ -446,6 +502,12 @@ public Plugin(
 
     public void Dispose()
     {
+        ClientState.Login -= OnLogin;
+        ClientState.Logout -= OnLogout;
+
+        // Dispose new Echokraut Integration Services
+        ServiceContainer?.Dispose();
+        
         DetectLanguageHelper.Dispose();
         PlayingHelper.Dispose();
         SoundHelper.Dispose();
