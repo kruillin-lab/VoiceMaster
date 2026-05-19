@@ -68,6 +68,16 @@ namespace VoiceMaster.Helper.API
             }
         }
 
+        public static async Task RefreshVoicesAsync(EKEventId eventId)
+        {
+            if (Backend == null)
+            {
+                LogHelper.Error(MethodBase.GetCurrentMethod().Name, "Cannot refresh voices: backend not initialized", eventId);
+                return;
+            }
+            await GetAndMapVoices(eventId);
+        }
+
         public static async Task<bool> ReloadService(string reloadModel, EKEventId eventId)
         {
             return await Backend.ReloadService(reloadModel, eventId).ConfigureAwait(false);
@@ -229,7 +239,8 @@ namespace VoiceMaster.Helper.API
         static async Task GetAndMapVoices(EKEventId eventId)
         {
             LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Loading and mapping voices", eventId);
-            var backendVoices = await Backend.GetAvailableVoices(eventId);
+            var englishOnly = Plugin.Configuration.InworldEnglishOnly;
+            var backendVoices = await Backend.GetAvailableVoices(eventId, englishOnly);
 
             
             // Guard: if the backend returns no voices (backend offline / endpoint misconfigured / transient failure),
@@ -397,7 +408,7 @@ namespace VoiceMaster.Helper.API
             LogHelper.Debug(MethodBase.GetCurrentMethod().Name, $"Searching voice: {npcData.Voice?.VoiceName ?? ""} for NPC: {npcData.Name}", eventId);
             var voiceItem = npcData.Voice;
             var isChild = npcData.IsChild;
-            var mappedList = npcData.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player ? Plugin.Configuration.MappedPlayers : Plugin.Configuration.MappedNpcs;
+            var mappedList = npcData.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Pc ? Plugin.Configuration.MappedPlayers : Plugin.Configuration.MappedNpcs;
 
             if (voiceItem == null || voiceItem == Plugin.Configuration.VoiceMasterVoices.Find(p => p.IsDefault))
             {
@@ -426,7 +437,7 @@ namespace VoiceMaster.Helper.API
 
                 if (voiceItem != npcData.Voice)
                 {
-                    if (npcData.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player)
+                    if (npcData.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Pc)
                     {
                         LogHelper.Debug(MethodBase.GetCurrentMethod().Name, $"Chose voice: {voiceItem} for Player: {npcName}", eventId);
                     }

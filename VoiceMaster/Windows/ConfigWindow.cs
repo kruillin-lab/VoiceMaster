@@ -612,6 +612,19 @@ public class ConfigWindow : Window, IDisposable
         }
         ImGui.Spacing();
 
+        // English-only voice filter toggle
+        var englishOnly = Plugin.Configuration!.InworldEnglishOnly;
+        if (ImGui.Checkbox("Show only English voices", ref englishOnly))
+        {
+            Plugin.Configuration.InworldEnglishOnly = englishOnly;
+            Plugin.Configuration.Save();
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("When enabled, only English-labeled voices from Inworld AI are shown in the voice list.\nDisable to see all available voices.");
+        }
+        ImGui.Spacing();
+
         var workspaceId = Plugin.Configuration!.InworldAI.WorkspaceId;
         if (ImGui.InputText("Workspace ID", ref workspaceId, 100))
         {
@@ -655,9 +668,18 @@ public class ConfigWindow : Window, IDisposable
         }
         
         ImGui.TextWrapped("Note: Inworld TTS now uses voice display names in the UI and resolves them internally.");
-        ImGui.TextWrapped("If the dropdown is empty, switch backend to 'Alltalk' and back to 'InworldAI' to refresh voices.");
 
         ImGui.Spacing();
+        if (ImGui.Button("Refresh voices"))
+        {
+            Task.Run(async () =>
+            {
+                var eventId = new EKEventId(0, TextSource.None);
+                await BackendHelper.RefreshVoicesAsync(eventId);
+                LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Inworld voice list refreshed", eventId);
+            });
+        }
+        ImGui.SameLine();
         if (ImGui.Button("Test Connection"))
         {
             Task.Run(async () =>
@@ -1003,7 +1025,7 @@ public class ConfigWindow : Window, IDisposable
                                 if (existing != null)
                                 {
                                     existing.Voice = selectedVoice;
-                                    existing.ObjectKind = ObjectKind.Player;
+                                    existing.ObjectKind = ObjectKind.Pc;
                                     existing.Name = name;
                                     existing.HomeWorld = homeWorld;
                                     existing.Gender = _addPlayerGenderIndex == 1 ? Genders.Male : (_addPlayerGenderIndex == 2 ? Genders.Female : Genders.None);
@@ -1012,11 +1034,11 @@ public class ConfigWindow : Window, IDisposable
                                 }
                                 else
                                 {
-                                    var data = new VoiceMaster.DataClasses.NpcMapData(ObjectKind.Player)
+                                    var data = new VoiceMaster.DataClasses.NpcMapData(ObjectKind.Pc)
                                     {
                                         Name = name,
                                         HomeWorld = homeWorld,
-                                        ObjectKind = ObjectKind.Player,
+                                        ObjectKind = ObjectKind.Pc,
                                         Gender = _addPlayerGenderIndex == 1 ? Genders.Male : (_addPlayerGenderIndex == 2 ? Genders.Female : Genders.None),
                                         Race = Enum.TryParse<NpcRaces>(playableRaceNames[_addPlayerRaceIndex], out var parsedRace) ? parsedRace : NpcRaces.Unknown,
                                         RaceStr = string.Empty,

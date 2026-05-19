@@ -59,6 +59,7 @@ public class Configuration : IPluginConfiguration
     public bool VoiceChatYell { get; set; } = false;
     public bool VoiceChatShout { get; set; } = false;
     public bool VoiceChatFreeCompany { get; set; } = false;
+    public bool InworldEnglishOnly { get; set; } = true;
     public List<PhoneticCorrection> PhoneticCorrections { get; set; } = new List<PhoneticCorrection>();
 
 

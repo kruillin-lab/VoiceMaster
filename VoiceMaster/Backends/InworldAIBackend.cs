@@ -314,48 +314,65 @@ namespace VoiceMaster.Backend
             return null; // data chunk not found
         }
 
-        public async Task<List<string>> GetAvailableVoices(EKEventId eventId)
+        public async Task<List<string>> GetAvailableVoices(EKEventId eventId, bool englishOnly = true)
         {
             var voices = new List<string>();
             try
             {
-                var url = "https://api.inworld.ai/tts/v1/voices";
-                var request = new HttpRequestMessage(HttpMethod.Get, url);
-                request.Headers.Authorization = GetBasicAuthHeader();
-
-                var response = await _httpClient.SendAsync(request).ConfigureAwait(false);
-                if (!response.IsSuccessStatusCode)
-                {
-                     return voices;
-                }
-
-                var content = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                var json = JObject.Parse(content);
+                var url = "https://api.inworld.ai/voices/v1/voices";
                 _displayNameToVoiceId.Clear();
                 _voiceIds.Clear();
 
-                if (json["voices"] != null)
+                string pageToken = "";
+                do
                 {
-                    foreach (var voiceNode in json["voices"])
+                    var queryUrl = url;
+                    var separator = "?";
+                    
+                    if (englishOnly)
                     {
-                        var id = voiceNode["voiceId"]?.ToString() ?? voiceNode["id"]?.ToString();
-                        if (!string.IsNullOrWhiteSpace(id))
+                        queryUrl += "?filter=lang_code%20%3D%20%22en%22";
+                        separator = "&";
+                    }
+                    
+                    if (!string.IsNullOrEmpty(pageToken))
+                    {
+                        queryUrl += $"{separator}pageToken={Uri.EscapeDataString(pageToken)}";
+                    }
+                    
+                    var request = new HttpRequestMessage(HttpMethod.Get, queryUrl);
+                    request.Headers.Authorization = GetBasicAuthHeader();
+
+                    var response = await _httpClient.SendAsync(request).ConfigureAwait(false);
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        LogHelper.Error(MethodBase.GetCurrentMethod().Name,
+                            $"Voices API returned {response.StatusCode}", eventId);
+                        return voices;
+                    }
+
+                    var content = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    var json = JObject.Parse(content);
+
+                    if (json["voices"] != null)
+                    {
+                        foreach (var voiceNode in json["voices"])
                         {
+                            var id = voiceNode["voiceId"]?.ToString();
+                            if (string.IsNullOrWhiteSpace(id))
+                                continue;
+
                             _voiceIds.Add(id);
 
-                            var displayName =
-                                voiceNode["displayName"]?.ToString() ??
-                                voiceNode["name"]?.ToString() ??
-                                id;
-
-                            if (!string.IsNullOrWhiteSpace(displayName))
-                            {
-                                _displayNameToVoiceId[displayName] = id;
-                                voices.Add(displayName);
-                            }
+                            var displayName = voiceNode["displayName"]?.ToString() ?? id;
+                            _displayNameToVoiceId[displayName] = id;
+                            voices.Add(displayName);
                         }
                     }
+
+                    pageToken = json["nextPageToken"]?.ToString() ?? "";
                 }
+                while (!string.IsNullOrEmpty(pageToken));
             }
             catch (Exception ex)
             {
@@ -368,7 +385,7 @@ namespace VoiceMaster.Backend
         {
             try
             {
-                 var voices = await GetAvailableVoices(eventId);
+                 var voices = await GetAvailableVoices(eventId, englishOnly: false);
                  return voices.Count > 0 ? "Ready" : "NotReady (No characters found or Auth failed)";
             }
             catch
@@ -392,7 +409,7 @@ namespace VoiceMaster.Backend
                 return string.Empty;
 
             if (_displayNameToVoiceId.Count == 0 && _voiceIds.Count == 0)
-                await GetAvailableVoices(eventId);
+                await GetAvailableVoices(eventId, englishOnly: false);
 
             if (_displayNameToVoiceId.TryGetValue(selectedVoice, out var mappedId))
                 return mappedId;

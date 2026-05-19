@@ -9,7 +9,7 @@ namespace VoiceMaster.Backend
 {
     public interface ITTSBackend
     {
-        Task<List<string>> GetAvailableVoices(EKEventId eventId);
+        Task<List<string>> GetAvailableVoices(EKEventId eventId, bool englishOnly = true);
         Task<Stream> GenerateAudioStreamFromVoice(EKEventId eventId, VoiceMessage voiceLine, string voice, ClientLanguage language);
         Task<string> CheckReady(EKEventId eventId);
         Task<bool> ReloadService(string reloadModel, EKEventId eventId);

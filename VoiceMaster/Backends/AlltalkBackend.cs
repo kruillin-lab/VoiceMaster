@@ -80,7 +80,7 @@ namespace VoiceMaster.Backend
             return null;
         }
 
-        public async Task<List<string>> GetAvailableVoices(EKEventId eventId)
+        public async Task<List<string>> GetAvailableVoices(EKEventId eventId, bool englishOnly = true)
         {
             LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Loading Alltalk Voices", eventId);
             var mappedVoices = new List<string>();
