@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using VoiceMaster.DataClasses;
@@ -16,6 +17,11 @@ namespace VoiceMaster.Backend
 {
     public class AlltalkBackend : ITTSBackend
     {
+        private static readonly HttpClient SharedHttpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
+
         public async Task<Stream> GenerateAudioStreamFromVoice(EKEventId eventId, VoiceMessage message, string voice, ClientLanguage language)
         {
             LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Generating Alltalk Audio", eventId);
@@ -86,11 +92,8 @@ namespace VoiceMaster.Backend
             var mappedVoices = new List<string>();
             try
             {
-                HttpClient httpClient = new HttpClient();
-                httpClient.BaseAddress = new Uri(Plugin.Configuration.Alltalk.BaseUrl);
-                httpClient.Timeout = TimeSpan.FromSeconds(5);
                 var uriBuilder = new UriBuilder(Plugin.Configuration.Alltalk.BaseUrl) { Path = Plugin.Configuration.Alltalk.VoicesPath };
-                var resultStr = await httpClient.GetStringAsync(uriBuilder.Uri).ConfigureAwait(false);
+                var resultStr = await SharedHttpClient.GetStringAsync(uriBuilder.Uri).ConfigureAwait(false);
                 resultStr = resultStr.Replace("\\", "");
                 AlltalkVoices voices = System.Text.Json.JsonSerializer.Deserialize<AlltalkVoices>(resultStr);
 
@@ -110,15 +113,12 @@ namespace VoiceMaster.Backend
 
         public async void StopGenerating(EKEventId eventId)
         {
-            HttpClient httpClient = new HttpClient();
-            httpClient.BaseAddress = new Uri(Plugin.Configuration.Alltalk.BaseUrl);
-            httpClient.Timeout = TimeSpan.FromSeconds(5);
             LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Stopping Alltalk Generation", eventId);
-            HttpResponseMessage res = null;
             try
             {
+                var uriBuilder = new UriBuilder(Plugin.Configuration.Alltalk.BaseUrl) { Path = Plugin.Configuration.Alltalk.StopPath };
                 var content = new StringContent("");
-                res = await httpClient.PutAsync(Plugin.Configuration.Alltalk.StopPath, content).ConfigureAwait(false);
+                using var res = await SharedHttpClient.PutAsync(uriBuilder.Uri, content).ConfigureAwait(false);
             } catch (Exception ex)
             {
                 LogHelper.Error(MethodBase.GetCurrentMethod().Name, ex.ToString(), eventId);
@@ -127,13 +127,12 @@ namespace VoiceMaster.Backend
 
         public async Task<string> CheckReady(EKEventId eventId)
         {
-            HttpClient httpClient = new HttpClient();
-            httpClient.BaseAddress = new Uri(Plugin.Configuration.Alltalk.BaseUrl);
-            httpClient.Timeout = TimeSpan.FromSeconds(5);
             LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Checking if Alltalk is ready", eventId);
             try
             {
-                var res = await httpClient.GetAsync(Plugin.Configuration.Alltalk.ReadyPath).ConfigureAwait(false);
+                var uriBuilder = new UriBuilder(Plugin.Configuration.Alltalk.BaseUrl) { Path = Plugin.Configuration.Alltalk.ReadyPath };
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                using var res = await SharedHttpClient.GetAsync(uriBuilder.Uri, cts.Token).ConfigureAwait(false);
 
                 var responseString = await res.Content.ReadAsStringAsync().ConfigureAwait(false);
 
@@ -176,15 +175,12 @@ namespace VoiceMaster.Backend
 
         public async Task<bool> ReloadService(string reloadModel, EKEventId eventId)
         {
-            HttpClient httpClient = new HttpClient();
-            httpClient.BaseAddress = new Uri(Plugin.Configuration.Alltalk.BaseUrl);
-            httpClient.Timeout = TimeSpan.FromSeconds(5);
             LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Reloading Alltalk Service", eventId);
-            HttpResponseMessage res = null;
             try
             {
+                var uriBuilder = new UriBuilder(Plugin.Configuration.Alltalk.BaseUrl) { Path = Plugin.Configuration.Alltalk.ReloadPath + reloadModel };
                 var content = new StringContent("");
-                res = await httpClient.PostAsync(Plugin.Configuration.Alltalk.ReloadPath + reloadModel, content).ConfigureAwait(false);
+                using var res = await SharedHttpClient.PostAsync(uriBuilder.Uri, content).ConfigureAwait(false);
                 return true;
             }
             catch (Exception ex)

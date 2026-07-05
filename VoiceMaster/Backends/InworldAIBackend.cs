@@ -19,8 +19,6 @@ namespace VoiceMaster.Backend
 {
     public class InworldAIBackend : ITTSBackend
     {
-        private string _accessToken = "";
-        private DateTime _tokenExpiration = DateTime.MinValue;
         private readonly HttpClient _httpClient;
         private readonly Dictionary<string, string> _displayNameToVoiceId = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _voiceIds = new(StringComparer.OrdinalIgnoreCase);
@@ -30,6 +28,7 @@ namespace VoiceMaster.Backend
         public InworldAIBackend()
         {
             _httpClient = new HttpClient();
+            _httpClient.Timeout = TimeSpan.FromSeconds(30);
             var configDir = Plugin.PluginInterface.ConfigDirectory.FullName;
             _profileStore = new NpcVoiceProfileStore(configDir);
             _immersion = new ImmersionEngine(_profileStore);
@@ -44,11 +43,6 @@ namespace VoiceMaster.Backend
 
             var authString = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{apiKey}:{apiSecret}"));
             return new AuthenticationHeaderValue("Basic", authString);
-        }
-
-        private async Task EnsureAccessToken(EKEventId eventId)
-        {
-            await Task.CompletedTask;
         }
 
         public async Task<Stream> GenerateAudioStreamFromVoice(EKEventId eventId, VoiceMessage message, string voice, ClientLanguage language)
@@ -122,7 +116,7 @@ namespace VoiceMaster.Backend
                 var pipe = new Pipe();
 
                 // Background task: read NDJSON lines and write PCM chunks to pipe.
-                _ = Task.Run(async () =>
+                var pumpTask = Task.Run(async () =>
                 {
                     bool firstChunk = true;
                     int totalBytes = 0;
@@ -199,6 +193,12 @@ namespace VoiceMaster.Backend
                     }
                 });
 
+                pumpTask.ContinueWith(t =>
+                {
+                    LogHelper.Error(MethodBase.GetCurrentMethod().Name,
+                        $"Streaming TTS pump task faulted: {t.Exception}", eventId);
+                }, TaskContinuationOptions.OnlyOnFaulted);
+
                 // Return the reader side immediately — audio engine starts consuming
                 // as soon as the first PCM bytes are written above.
                 return pipe.Reader.AsStream();
@@ -243,12 +243,12 @@ namespace VoiceMaster.Backend
                 var responseContent = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
                 LogHelper.Debug(MethodBase.GetCurrentMethod().Name,
-                    $"Response Status: {response.StatusCode}, Body: {responseContent[..Math.Min(500, responseContent.Length)]}", eventId);
+                    $"Response Status: {response.StatusCode}, Content-Length: {responseContent.Length} chars", eventId);
 
                 if (!response.IsSuccessStatusCode)
                 {
                     LogHelper.Error(MethodBase.GetCurrentMethod().Name,
-                        $"TTS request failed: {response.StatusCode} - {responseContent}", eventId);
+                        $"TTS request failed: {response.StatusCode} - {responseContent[..Math.Min(300, responseContent.Length)]}", eventId);
                     return null;
                 }
 

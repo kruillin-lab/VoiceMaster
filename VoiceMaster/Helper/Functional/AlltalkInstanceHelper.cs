@@ -31,6 +31,20 @@ namespace VoiceMaster.Helper.Functional
         private static Process? InstanceProcess;
         private static bool InstanceProcessIsRunning;
 
+        private static readonly char[] ShellMetaCharacters = { '"', '\'', '`', '$', '&', '|', ';', '<', '>', '\n', '\r' };
+
+        private static bool IsSafeInstallPath(string installFolder)
+        {
+            return !string.IsNullOrWhiteSpace(installFolder) &&
+                   installFolder.IndexOfAny(ShellMetaCharacters) < 0;
+        }
+
+        private static bool IsSafeDownloadUrl(string url)
+        {
+            return Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+                   uri.Scheme == Uri.UriSchemeHttps;
+        }
+
         public static void Initialize()
         {
             IsWindows = Dalamud.Utility.Util.GetHostPlatform() == OSPlatform.Windows;
@@ -44,8 +58,15 @@ namespace VoiceMaster.Helper.Functional
                 if (!(!Installing && !InstallProcessIsRunning && InstallProcess == null && InstallThread == null))
                     StopInstall(eventId);
 
-                Installing = true;
                 var installFolder = Plugin.Configuration.Alltalk.LocalInstallPath;
+                if (!IsSafeInstallPath(installFolder))
+                {
+                    LogHelper.Error("Install", $"LocalInstallPath contains invalid or unsafe characters: '{installFolder}'", eventId);
+                    LogHelper.End("Install", eventId);
+                    return;
+                }
+
+                Installing = true;
                 var installFile = Path.Join(installFolder, "alltalk_tts.zip");
                 var installMSBTFile = Path.Join(installFolder, "vs_BuildTools.exe");
                 var alltalkFolderName = Path.GetFileNameWithoutExtension(Constants.ALLTALKURL);
@@ -84,9 +105,9 @@ namespace VoiceMaster.Helper.Functional
                         {
                             InstallThreadCts.Token.ThrowIfCancellationRequested();
                             LogHelper.Info("Install - Prerequisites", $"Downloading vs_BuildTools.exe", eventId);
-                            using (var client = new HttpClient())
+                            using (var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan })
                             {
-                                var response = client.GetByteArrayAsync(Constants.MSBUILDTOOLSURL);
+                                var response = client.GetByteArrayAsync(Constants.MSBUILDTOOLSURL, InstallThreadCts.Token);
                                 File.WriteAllBytes(installMSBTFile, response.Result);
                             }
 
@@ -108,9 +129,9 @@ namespace VoiceMaster.Helper.Functional
 
                         InstallThreadCts.Token.ThrowIfCancellationRequested();
                         LogHelper.Info("Install - AT", $"Downloading alltalk_tts.zip", eventId);
-                        using(var client = new HttpClient())
+                        using(var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan })
                         {
-                            var response = client.GetByteArrayAsync(Constants.ALLTALKURL);
+                            var response = client.GetByteArrayAsync(Constants.ALLTALKURL, InstallThreadCts.Token);
                             File.WriteAllBytes(installFile, response.Result);
                         }
 
@@ -122,7 +143,7 @@ namespace VoiceMaster.Helper.Functional
 
                         InstallThreadCts.Token.ThrowIfCancellationRequested();
                         LogHelper.Info("Install - MD", $"Downloading xtts2.0.3 model", eventId);
-                        using(var client = new HttpClient())
+                        using(var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan })
                         {
                             if (!Directory.Exists(modelFolder))
                                 Directory.CreateDirectory(modelFolder);
@@ -132,7 +153,7 @@ namespace VoiceMaster.Helper.Functional
                                 var uri = new Uri(xttsUrl);
                                 var fileName = Path.GetFileName(uri.LocalPath);
                                 LogHelper.Info("Install - MD", $"Downloading {fileName}", eventId);
-                                var response = client.GetByteArrayAsync(uri);
+                                var response = client.GetByteArrayAsync(uri, InstallThreadCts.Token);
                                 File.WriteAllBytes(Path.Join(modelFolder, fileName), response.Result);
                             }
                         }
@@ -140,11 +161,11 @@ namespace VoiceMaster.Helper.Functional
                         InstallThreadCts.Token.ThrowIfCancellationRequested();
                         LogHelper.Info("Install - VC", $"Downloading voices.zip", eventId);
                         LogHelper.Debug("Install - VC", $"{voicesFile}", eventId);
-                        using(var client = new HttpClient())
+                        using(var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan })
                         {
                             try
                             {
-                                var response = client.GetByteArrayAsync(Constants.VOICESURL);
+                                var response = client.GetByteArrayAsync(Constants.VOICESURL, InstallThreadCts.Token);
                                 File.WriteAllBytes(voicesFile, response.Result);
                             }
                             catch (Exception ex)
@@ -161,11 +182,11 @@ namespace VoiceMaster.Helper.Functional
                         InstallThreadCts.Token.ThrowIfCancellationRequested();
                         LogHelper.Info("Install - VC2", $"Downloading voices2.zip", eventId);
                         LogHelper.Debug("Install - VC2", $"{voices2File}", eventId);
-                        using(var client = new HttpClient())
+                        using(var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan })
                         {
                             try
                             {
-                                var response = client.GetByteArrayAsync(Constants.VOICES2URL);
+                                var response = client.GetByteArrayAsync(Constants.VOICES2URL, InstallThreadCts.Token);
                                 File.WriteAllBytes(voices2File, response.Result);
                             }
                             catch (Exception ex)
@@ -186,14 +207,29 @@ namespace VoiceMaster.Helper.Functional
                         if (IsWindows)
                         {
                             InstallProcess.StartInfo.FileName = "cmd.exe";
-                            InstallProcess.StartInfo.Arguments =
-                                $"/C start \"atsetup\" /wait {Path.Join(alltalkFolder, "atsetup.bat")} -silent";
+                            InstallProcess.StartInfo.ArgumentList.Add("/C");
+                            InstallProcess.StartInfo.ArgumentList.Add("start");
+                            InstallProcess.StartInfo.ArgumentList.Add("atsetup");
+                            InstallProcess.StartInfo.ArgumentList.Add("/wait");
+                            InstallProcess.StartInfo.ArgumentList.Add(Path.Join(alltalkFolder, "atsetup.bat"));
+                            InstallProcess.StartInfo.ArgumentList.Add("-silent");
                         }
                         else
                         {
-                            InstallProcess.StartInfo.FileName = "/bin/bash";
-                            InstallProcess.StartInfo.Arguments =
-                                $"-c \"setsid bash -c '{Path.Join(alltalkFolder, "atsetup.sh")} -silent' & wait $!\"";
+                            var atsetupScript = Path.Join(alltalkFolder, "atsetup.sh");
+                            try
+                            {
+                                File.SetUnixFileMode(atsetupScript,
+                                                     UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                                                     UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+                                                     UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+                            }
+                            catch (Exception ex)
+                            {
+                                LogHelper.Error("Install - PC", $"Error while marking atsetup.sh executable: {ex}", eventId);
+                            }
+                            InstallProcess.StartInfo.FileName = atsetupScript;
+                            InstallProcess.StartInfo.ArgumentList.Add("-silent");
                         }
 
                         LogHelper.Debug("Install - PC", $"Calling atsetup", eventId);
@@ -318,6 +354,13 @@ namespace VoiceMaster.Helper.Functional
                 {
                     try
                     {
+                        if (!IsSafeInstallPath(Plugin.Configuration.Alltalk.LocalInstallPath))
+                        {
+                            LogHelper.Error("StartInstance", $"LocalInstallPath contains invalid or unsafe characters: '{Plugin.Configuration.Alltalk.LocalInstallPath}'", eventId);
+                            LogHelper.End("StartInstance", eventId);
+                            return;
+                        }
+
                         InstanceStarting = true;
                         InstanceProcess = new Process();
                         var alltalkFolder = Path.Join(Plugin.Configuration.Alltalk.LocalInstallPath,
@@ -392,7 +435,7 @@ namespace VoiceMaster.Helper.Functional
                                 }
 
                                 // Python-Skript ausführen
-                                command = $"python -u {Path.Join(alltalkFolder, "script.py")}";
+                                command = $"python -u \"{Path.Join(alltalkFolder, "script.py")}\"";
                                 sw.WriteLine(command);
                             }
                         }
@@ -521,7 +564,7 @@ namespace VoiceMaster.Helper.Functional
                 {
                     LogHelper.Info("InstallCustomData", $"Downloading custom model", eventId);
                     LogHelper.Debug("InstallCustomData", $"{Plugin.Configuration.Alltalk.CustomVoicesUrl}", eventId);
-                    using (var client = new HttpClient())
+                    using (var client = new HttpClient { Timeout = TimeSpan.FromMinutes(30) })
                     {
                         try
                         {
@@ -536,27 +579,34 @@ namespace VoiceMaster.Helper.Functional
                                 GoogleDriveLinkHelper.CheckForGoogleAndConvertToDirectDownloadLink(
                                     Plugin.Configuration.Alltalk.CustomModelUrl, out bool isGoogle);
                             LogHelper.Debug("InstallCustomData", $"{downloadUrl}", eventId);
-                            var response = await client.GetAsync(downloadUrl);
-
-                            if (isGoogle)
-                                response = GoogleDriveLinkHelper.DownloadGoogleDrive(downloadUrl, response, client);
-
-                            using (var fs = new FileStream(modelFile, FileMode.Create, FileAccess.Write))
+                            if (!IsSafeDownloadUrl(downloadUrl))
                             {
-                                await response.Content.CopyToAsync(fs);
+                                LogHelper.Error("InstallCustomData", $"Custom model URL must be https, skipping: '{downloadUrl}'", eventId);
                             }
-
-                            LogHelper.Info("InstallCustomData", $"Extracting custom model", eventId);
-                            System.IO.Compression.ZipFile.ExtractToDirectory(modelFile, modelFolder, true);
-                            File.Delete(modelFile);
-
-                            var ttsEnginesFile = Path.Join(alltalkFolder, "system", "tts_engines", "tts_engines.json");
-                            dynamic configEngines = JsonConvert.DeserializeObject(File.ReadAllText(ttsEnginesFile));
-                            if (configEngines != null)
+                            else
                             {
-                                configEngines["engine_loaded"] = "xtts";
-                                configEngines["selected_model"] = $"xtts - {modelFolderName}";
-                                File.WriteAllText(ttsEnginesFile, JsonConvert.SerializeObject(configEngines));
+                                var response = await client.GetAsync(downloadUrl, InstallThreadCts?.Token ?? CancellationToken.None);
+
+                                if (isGoogle)
+                                    response = GoogleDriveLinkHelper.DownloadGoogleDrive(downloadUrl, response, client);
+
+                                using (var fs = new FileStream(modelFile, FileMode.Create, FileAccess.Write))
+                                {
+                                    await response.Content.CopyToAsync(fs);
+                                }
+
+                                LogHelper.Info("InstallCustomData", $"Extracting custom model", eventId);
+                                System.IO.Compression.ZipFile.ExtractToDirectory(modelFile, modelFolder, true);
+                                File.Delete(modelFile);
+
+                                var ttsEnginesFile = Path.Join(alltalkFolder, "system", "tts_engines", "tts_engines.json");
+                                dynamic configEngines = JsonConvert.DeserializeObject(File.ReadAllText(ttsEnginesFile));
+                                if (configEngines != null)
+                                {
+                                    configEngines["engine_loaded"] = "xtts";
+                                    configEngines["selected_model"] = $"xtts - {modelFolderName}";
+                                    File.WriteAllText(ttsEnginesFile, JsonConvert.SerializeObject(configEngines));
+                                }
                             }
                         }
                         catch (Exception ex)
@@ -574,30 +624,37 @@ namespace VoiceMaster.Helper.Functional
                     LogHelper.Info("InstallCustomData", $"Downloading custom voices", eventId);
                     LogHelper.Debug("InstallCustomData",
                                     $"{Plugin.Configuration.Alltalk.CustomVoicesUrl}", eventId);
-                    using (var client = new HttpClient())
+                    using (var client = new HttpClient { Timeout = TimeSpan.FromMinutes(30) })
                     {
                         try
                         {
                             var downloadUrl = GoogleDriveLinkHelper.CheckForGoogleAndConvertToDirectDownloadLink(Plugin.Configuration.Alltalk.CustomVoicesUrl, out bool isGoogle);
                             LogHelper.Debug("InstallCustomData",
                                             $"{downloadUrl}", eventId);
-                            var response = await client.GetAsync(downloadUrl);
-
-                            if (isGoogle)
-                                response = GoogleDriveLinkHelper.DownloadGoogleDrive(downloadUrl, response, client);
-
-                            using (var fs = new FileStream(voicesFile, FileMode.Create, FileAccess.Write))
+                            if (!IsSafeDownloadUrl(downloadUrl))
                             {
-                                await response.Content.CopyToAsync(fs);
+                                LogHelper.Error("InstallCustomData", $"Custom voices URL must be https, skipping: '{downloadUrl}'", eventId);
                             }
+                            else
+                            {
+                                var response = await client.GetAsync(downloadUrl, InstallThreadCts?.Token ?? CancellationToken.None);
 
-                            LogHelper.Info("InstallCustomData", $"Deleting existing voices", eventId);
-                            if (Directory.Exists(voicesFolder))
-                                Directory.Delete(voicesFolder, true);
+                                if (isGoogle)
+                                    response = GoogleDriveLinkHelper.DownloadGoogleDrive(downloadUrl, response, client);
 
-                            LogHelper.Info("InstallCustomData", $"Extracting custom voices", eventId);
-                            System.IO.Compression.ZipFile.ExtractToDirectory(voicesFile, alltalkFolder, true);
-                            File.Delete(voicesFile);
+                                using (var fs = new FileStream(voicesFile, FileMode.Create, FileAccess.Write))
+                                {
+                                    await response.Content.CopyToAsync(fs);
+                                }
+
+                                LogHelper.Info("InstallCustomData", $"Deleting existing voices", eventId);
+                                if (Directory.Exists(voicesFolder))
+                                    Directory.Delete(voicesFolder, true);
+
+                                LogHelper.Info("InstallCustomData", $"Extracting custom voices", eventId);
+                                System.IO.Compression.ZipFile.ExtractToDirectory(voicesFile, alltalkFolder, true);
+                                File.Delete(voicesFile);
+                            }
                         }
                         catch (Exception ex)
                         {

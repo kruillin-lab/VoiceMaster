@@ -92,6 +92,9 @@ namespace VoiceMaster.Helper.Data
 
                     foreach (var player in oldPlayerMapData)
                     {
+                        if (player.voiceItem == null)
+                            continue;
+
                         player.Voice =
                             Plugin.Configuration.VoiceMasterVoices.Find(p => p.BackendVoice == player.voiceItem.Voice);
 
@@ -105,6 +108,9 @@ namespace VoiceMaster.Helper.Data
 
                     foreach (var npc in oldNpcMapData)
                     {
+                        if (npc.voiceItem == null)
+                            continue;
+
                         npc.Voice = Plugin.Configuration.VoiceMasterVoices.Find(p => p.BackendVoice == npc.voiceItem.Voice);
 
                         LogHelper.Debug(MethodBase.GetCurrentMethod().Name,

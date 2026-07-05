@@ -15,7 +15,7 @@ using System.Text.RegularExpressions;
 
 namespace VoiceMaster.Helper.Functional
 {
-    public class LipSyncHelper()
+    public class LipSyncHelper() : IDisposable
     {
         private readonly Dictionary<string, CancellationTokenSource> taskCancellations =
             new Dictionary<string, CancellationTokenSource>();
@@ -171,6 +171,32 @@ namespace VoiceMaster.Helper.Functional
                     LogHelper.Error(MethodBase.GetCurrentMethod().Name, ex, message.EventId);
                 }
             }
+        }
+
+        public void CancelAll()
+        {
+            foreach (KeyValuePair<string, CancellationTokenSource> entry in _runningTasks.ToArray())
+            {
+                if (!_runningTasks.TryRemove(entry.Key, out CancellationTokenSource? cts)) continue;
+
+                try
+                {
+                    cts.Cancel();
+                }
+                catch (Exception ex)
+                {
+                    LogHelper.Error(MethodBase.GetCurrentMethod().Name, ex, null);
+                }
+                finally
+                {
+                    cts.Dispose();
+                }
+            }
+        }
+
+        public void Dispose()
+        {
+            CancelAll();
         }
 
         private async Task AnimateLipSync(

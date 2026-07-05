@@ -29,9 +29,6 @@ public class AudioPlaybackService : IDisposable
 
     private bool _isPlaying;
 
-    public event Action<EKEventId>? AutoAdvanceRequested;
-    public event Action<VoiceMessage?>? CurrentMessageChanged;
-
     public bool IsPlaying => _isPlaying;
 
     public AudioPlaybackService(

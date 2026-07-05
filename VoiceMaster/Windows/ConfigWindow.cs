@@ -557,14 +557,14 @@ public class ConfigWindow : Window, IDisposable
 
         ImGui.Spacing();
         var apiKey = Plugin.Configuration!.InworldAI.ApiKey;
-        if (ImGui.InputText("API Key", ref apiKey, 100))
+        if (ImGui.InputText("API Key", ref apiKey, 100, ImGuiInputTextFlags.Password))
         {
             Plugin.Configuration.InworldAI.ApiKey = apiKey;
             Plugin.Configuration.Save();
         }
 
         var apiSecret = Plugin.Configuration!.InworldAI.ApiSecret;
-        if (ImGui.InputText("API Secret", ref apiSecret, 100))
+        if (ImGui.InputText("API Secret", ref apiSecret, 100, ImGuiInputTextFlags.Password))
         {
             Plugin.Configuration.InworldAI.ApiSecret = apiSecret;
             Plugin.Configuration.Save();
@@ -573,7 +573,7 @@ public class ConfigWindow : Window, IDisposable
         // Base64 credential paste helper
         ImGui.Spacing();
         var base64Creds = "";
-        if (ImGui.InputText("Paste Base64 Credentials (Optional)", ref base64Creds, 200, ImGuiInputTextFlags.EnterReturnsTrue))
+        if (ImGui.InputText("Paste Base64 Credentials (Optional)", ref base64Creds, 200, ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.Password))
         {
             try
             {

@@ -521,6 +521,9 @@ public Plugin(
         Configuration.Save();
         WindowSystem.RemoveAllWindows();
         ConfigWindow.Dispose();
+        AlltalkInstanceWindow.Dispose();
+        FirstTimeWindow.Dispose();
+        DialogExtraOptionsWindow.Dispose();
         CommandHelper.Dispose();
         AlltalkInstanceHelper.Dispose();
     }

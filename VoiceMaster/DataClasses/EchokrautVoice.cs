@@ -85,6 +85,11 @@ namespace VoiceMaster.DataClasses
             return this.ToString().Equals(item.ToString(), System.StringComparison.OrdinalIgnoreCase);
         }
 
+        public override int GetHashCode()
+        {
+            return voiceName?.GetHashCode(StringComparison.OrdinalIgnoreCase) ?? 0;
+        }
+
         public int CompareTo(object? obj)
         {
             var otherObj = ((VoiceMasterVoice)obj);

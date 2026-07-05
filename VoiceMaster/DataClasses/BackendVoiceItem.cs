@@ -4,7 +4,6 @@ using System.Xml.Linq;
 
 namespace VoiceMaster.DataClasses
 {
-    [Obsolete("Only kept for migrating old data, not in use anymore", false)]
     public class BackendVoiceItem : IComparable
     {
         public string VoiceName { get; set; } = "";

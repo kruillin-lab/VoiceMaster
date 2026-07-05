@@ -1,6 +1,5 @@
 using Dalamud.Game;
 using VoiceMaster.DataClasses;
-using VoiceMaster.Properties;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;

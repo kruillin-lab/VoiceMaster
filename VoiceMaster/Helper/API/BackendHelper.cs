@@ -18,7 +18,7 @@ namespace VoiceMaster.Helper.API
     public static class BackendHelper
     {
         static Random Rand { get; set; }
-        static ITTSBackend Backend { get; set; }
+        static ITTSBackend? Backend { get; set; }
 
         public static void Initialize(TTSBackends backendType)
         {
@@ -80,6 +80,11 @@ namespace VoiceMaster.Helper.API
 
         public static async Task<bool> ReloadService(string reloadModel, EKEventId eventId)
         {
+            if (Backend == null)
+            {
+                LogHelper.Error(MethodBase.GetCurrentMethod().Name, "Cannot reload service: backend not initialized", eventId);
+                return false;
+            }
             return await Backend.ReloadService(reloadModel, eventId).ConfigureAwait(false);
         }
 
@@ -238,6 +243,12 @@ namespace VoiceMaster.Helper.API
 
         static async Task GetAndMapVoices(EKEventId eventId)
         {
+            if (Backend == null)
+            {
+                LogHelper.Error(MethodBase.GetCurrentMethod().Name, "Cannot get and map voices: backend not initialized", eventId);
+                return;
+            }
+
             LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Loading and mapping voices", eventId);
             var englishOnly = Plugin.Configuration.InworldEnglishOnly;
             var backendVoices = await Backend.GetAvailableVoices(eventId, englishOnly);
@@ -354,6 +365,12 @@ namespace VoiceMaster.Helper.API
             LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Generating...", eventId);
             try
             {
+                if (Backend == null)
+                {
+                    LogHelper.Error(MethodBase.GetCurrentMethod().Name, "Cannot generate voice: backend not initialized", eventId);
+                    return false;
+                }
+
                 if (PlayingHelper.RequestedQueue.Contains(message))
                 {
                     var voice = GetVoice(eventId, message.Speaker);
@@ -400,6 +417,11 @@ namespace VoiceMaster.Helper.API
 
         public static async Task<string> CheckReady(EKEventId eventId)
         {
+            if (Backend == null)
+            {
+                LogHelper.Error(MethodBase.GetCurrentMethod().Name, "Cannot check ready: backend not initialized", eventId);
+                return string.Empty;
+            }
             return await Backend.CheckReady(eventId);
         }
 

@@ -124,7 +124,6 @@ namespace VoiceMaster.Helper.Addons
 
         public void Dispose()
         {
-            ManagedBass.Bass.Free();
             mOpenChatBubbleHook?.Dispose();
         }
     }

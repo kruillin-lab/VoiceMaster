@@ -10,11 +10,11 @@ namespace VoiceMaster.DataClasses
 {
     public class NpcMapData : IComparable
     {
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
         public ulong ContentId { get; set; }
         public string HomeWorld { get; set; } = string.Empty;
         public NpcRaces Race { get; set; }
-        public string RaceStr { get; set; }
+        public string RaceStr { get; set; } = string.Empty;
         public Genders Gender { get; set; }
 
         public bool IsChild { get; set; }
@@ -25,7 +25,7 @@ namespace VoiceMaster.DataClasses
             get => NpcDataHelper.GetVoiceByBackendVoice(voice);
             set => voice = value != null ? value.BackendVoice : string.Empty;
         }
-        public BackendVoiceItem voiceItem { get; set; }
+        public BackendVoiceItem voiceItem { get; set; } = new();
 
         public bool DoNotDelete { get; set; }
         public bool IsEnabled { get; set; } = true;
@@ -36,10 +36,10 @@ namespace VoiceMaster.DataClasses
 
         public ObjectKind ObjectKind { get; set; }
 
-        internal ClippedSelectableCombo<VoiceMasterVoice> VoicesSelectable { get; set; }
-        internal ClippedSelectableCombo<VoiceMasterVoice> VoicesSelectableDialogue { get; set; }
+        internal ClippedSelectableCombo<VoiceMasterVoice> VoicesSelectable { get; set; } = new(string.Empty, string.Empty, 200, new List<VoiceMasterVoice>(), g => g.VoiceNameNote);
+        internal ClippedSelectableCombo<VoiceMasterVoice> VoicesSelectableDialogue { get; set; } = new(string.Empty, string.Empty, 200, new List<VoiceMasterVoice>(), g => g.VoiceNameNote);
 
-        internal List<VoiceMasterVoice> Voices { get; set; }
+        internal List<VoiceMasterVoice> Voices { get; set; } = new();
 
         public NpcMapData(ObjectKind objectKind) {
             this.ObjectKind = objectKind;
@@ -48,9 +48,9 @@ namespace VoiceMaster.DataClasses
         public override string ToString()
         {
             var raceString = Race == NpcRaces.Unknown ? RaceStr : Race.ToString();
-            var name = Name;
-            if (ObjectKind == ObjectKind.Pc && !string.IsNullOrWhiteSpace(HomeWorld) && !Name.Contains("@"))
-                name = $"{Name}@{HomeWorld}";
+            var name = Name ?? string.Empty;
+            if (ObjectKind == ObjectKind.Pc && !string.IsNullOrWhiteSpace(HomeWorld) && !name.Contains("@"))
+                name = $"{name}@{HomeWorld}";
             return $"{Gender} - {raceString} - {name}";
         }
         public override bool Equals(object obj)
@@ -63,6 +63,11 @@ namespace VoiceMaster.DataClasses
             }
 
             return this.ToString().Equals(item.ToString(), System.StringComparison.OrdinalIgnoreCase);
+        }
+
+        public override int GetHashCode()
+        {
+            return ToString().ToUpperInvariant().GetHashCode();
         }
 
         public int CompareTo(object? obj)

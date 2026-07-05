@@ -161,7 +161,9 @@ namespace VoiceMaster.Helper.Functional
             
             if (use3D)
                 AudioEngine.SetSourcePoller(queueItem.StreamId, () => new Vector3D(queueItem.SpeakerFollowObj?.Position.X ?? 0, queueItem.SpeakerFollowObj?.Position.Y ?? 0, queueItem.SpeakerFollowObj?.Position.Z ?? 0));
-            Plugin.LipSyncHelper.TryLipSync(queueItem);
+            _ = Plugin.LipSyncHelper.TryLipSync(queueItem).ContinueWith(t =>
+                LogHelper.Error(MethodBase.GetCurrentMethod().Name, t.Exception!.Flatten().InnerException ?? t.Exception, queueItem.EventId),
+                TaskContinuationOptions.OnlyOnFaulted);
             LogHelper.Info(MethodBase.GetCurrentMethod().Name, $"Lipsyncdata text: {queueItem.Speaker.Name}",
                            queueItem.EventId);
             Playing = true;
@@ -367,9 +369,16 @@ namespace VoiceMaster.Helper.Functional
         {
             try
             {
+                AudioEngine.SourceEnded -= SoundOut_PlaybackStopped;
                 StopThread = true;
                 PlayingQueueThread.Interrupt();
                 RequestingQueueThread.Interrupt();
+            }
+            catch { }
+
+            try
+            {
+                AudioEngine.Dispose();
             }
             catch { }
         }

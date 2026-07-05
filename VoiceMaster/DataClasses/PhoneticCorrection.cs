@@ -23,10 +23,18 @@ namespace VoiceMaster.DataClasses
 
         public override bool Equals(object? obj)
         {
-            if (((PhoneticCorrection)obj).ToString().ToLower() == ToString().ToLower())
-                return true ;
+            if (obj is not PhoneticCorrection other)
+                return false;
+
+            if (other.ToString().ToLower() == ToString().ToLower())
+                return true;
 
             return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return ToString().ToLowerInvariant().GetHashCode();
         }
 
         public int CompareTo(object? obj)

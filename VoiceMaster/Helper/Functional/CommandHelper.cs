@@ -376,6 +376,7 @@ public static void PrintDebugInfo()
             Plugin.CommandManager.RemoveHandler("/vmtalk");
             Plugin.CommandManager.RemoveHandler("/vmbtalk");
             Plugin.CommandManager.RemoveHandler("/vmbubble");
+            Plugin.CommandManager.RemoveHandler("/vmchat");
             Plugin.CommandManager.RemoveHandler("/vmcutschoice");
             Plugin.CommandManager.RemoveHandler("/vmchoice");
             Plugin.CommandManager.RemoveHandler("/vmignore");

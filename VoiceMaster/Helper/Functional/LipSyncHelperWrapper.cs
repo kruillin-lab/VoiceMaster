@@ -18,7 +18,6 @@ public class LipSyncHelperWrapper : ILipSyncHelper
 
     public Task TryLipSync(VoiceMessage message)
     {
-        _lipSyncHelper.TryLipSync(message);
-        return Task.CompletedTask;
+        return _lipSyncHelper.TryLipSync(message);
     }
 }
