@@ -1,1 +1,17 @@
-.vs
+# Build outputs
+bin/
+obj/
+dist/
+
+# IDE state
+.vs/
+.idea/
+*.user
+*.suo
+
+# Packages / archives
+*.zip
+
+# OS junk
+Thumbs.db
+.DS_Store
