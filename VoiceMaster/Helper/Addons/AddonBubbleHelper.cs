@@ -68,7 +68,7 @@ namespace VoiceMaster.Helper.Addons
                 if (pString != nint.Zero && !Plugin.ClientState.IsPvPExcludingDen)
                 {
                     //	Idk if the actor can ever be null, but if it can, assume that we should print the bubble just in case.  Otherwise, only don't print if the actor is a player.
-                    if (pActor == null && !voiceNext || (byte)pActor->ObjectKind != (byte)Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player && !voiceNext)
+                    if (pActor == null && !voiceNext || (byte)pActor->ObjectKind != (byte)Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Pc && !voiceNext)
                     {
                         var eventId = LogHelper.Start(MethodBase.GetCurrentMethod().Name, TextSource.AddonBubble);
                         LogHelper.Debug(MethodBase.GetCurrentMethod().Name, $"Found EntityId: {pActor->GetGameObjectId().ObjectId}", eventId);

@@ -107,7 +107,7 @@ public sealed class Live3DAudioEngine : IDisposable
         if (!_inited) return;
 
         // Guard: no player object exists (title screen, disconnected, etc.)
-        if (!Plugin.ClientState.IsLoggedIn || Plugin.ClientState.LocalPlayer == null)
+        if (!Plugin.ClientState.IsLoggedIn || Plugin.ObjectTable.LocalPlayer == null)
         {
             DalamudHelper.LocalPlayer = null;
             return;
@@ -116,7 +116,7 @@ public sealed class Live3DAudioEngine : IDisposable
         if (DalamudHelper.Camera == null && CameraManager.Instance() != null)
             DalamudHelper.Camera = CameraManager.Instance()->GetActiveCamera();
 
-        DalamudHelper.LocalPlayer = Plugin.ClientState.LocalPlayer;
+        DalamudHelper.LocalPlayer = Plugin.ObjectTable.LocalPlayer;
 
         if (DalamudHelper.Camera != null && DalamudHelper.LocalPlayer != null)
         {

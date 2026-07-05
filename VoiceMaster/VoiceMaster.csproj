@@ -73,7 +73,7 @@
   </ItemGroup>
 
   <!-- Auto-deploy to dev plugins folder after successful build -->
-  <Target Name="DeployToDevPlugins" AfterTargets="Build">
+  <Target Name="DeployToDevPlugins" AfterTargets="Build" Condition="'$(APPDATA)' != ''">
     <PropertyGroup>
       <DevPluginPath>$(APPDATA)\XIVLauncher\devPlugins\VoiceMaster</DevPluginPath>
     </PropertyGroup>

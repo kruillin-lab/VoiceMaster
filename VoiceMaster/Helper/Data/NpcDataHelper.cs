@@ -232,7 +232,7 @@ namespace VoiceMaster.Helper.Data
 
             // ---- Stable player mapping (B+) ----
             // Persist player mappings by (Name + HomeWorld) so cross-world / out-of-zone chat does not create new blank mappings.
-            if (data.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player)
+            if (data.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Pc)
             {
                 // Normalize Name@World into Name + HomeWorld if needed.
                 if (!string.IsNullOrWhiteSpace(data.Name) && data.Name.Contains('@'))
@@ -249,14 +249,14 @@ namespace VoiceMaster.Helper.Data
                 // Prefer exact Name + HomeWorld match when HomeWorld is known.
                 if (!string.IsNullOrWhiteSpace(data.HomeWorld))
                 {
-                    result = datas.Find(p => p.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player
+                    result = datas.Find(p => p.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Pc
                                           && string.Equals(p.Name, data.Name, StringComparison.OrdinalIgnoreCase)
                                           && string.Equals(p.HomeWorld, data.HomeWorld, StringComparison.OrdinalIgnoreCase));
 
                     // Migrate legacy entries (Name-only) to Name+HomeWorld if we found one.
                     if (result == null)
                     {
-                        var legacy = datas.Find(p => p.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player
+                        var legacy = datas.Find(p => p.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Pc
                                                 && string.Equals(p.Name, data.Name, StringComparison.OrdinalIgnoreCase)
                                                 && string.IsNullOrWhiteSpace(p.HomeWorld));
                         if (legacy != null)
@@ -270,10 +270,10 @@ namespace VoiceMaster.Helper.Data
                 // If HomeWorld is unknown, fall back to Name-only (prefer Name-only entries first).
                 if (result == null)
                 {
-                    result = datas.Find(p => p.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player
+                    result = datas.Find(p => p.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Pc
                                           && string.Equals(p.Name, data.Name, StringComparison.OrdinalIgnoreCase)
                                           && string.IsNullOrWhiteSpace(p.HomeWorld))
-                             ?? datas.Find(p => p.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player
+                             ?? datas.Find(p => p.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Pc
                                           && string.Equals(p.Name, data.Name, StringComparison.OrdinalIgnoreCase));
                 }
             }
@@ -287,7 +287,7 @@ namespace VoiceMaster.Helper.Data
             if (result != null)
             {
                 // Refresh identity fields when the existing entry is missing info (do NOT clobber user settings).
-                if (result.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player
+                if (result.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Pc
                     && string.IsNullOrWhiteSpace(result.HomeWorld)
                     && !string.IsNullOrWhiteSpace(data.HomeWorld))
                     result.HomeWorld = data.HomeWorld;
@@ -314,7 +314,7 @@ namespace VoiceMaster.Helper.Data
             ConfigWindow.UpdateDataBubbles = true;
             ConfigWindow.UpdateDataPlayers = true;
 
-            var mapping = data.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player ? "player" : "npc";
+            var mapping = data.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Pc ? "player" : "npc";
             LogHelper.Debug(MethodBase.GetCurrentMethod().Name, $"Added new {mapping} to mapping: {data}", eventId);
 
             return data;

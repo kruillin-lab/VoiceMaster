@@ -55,7 +55,7 @@ public static class CharacterDataHelper
         LogHelper.Info(MethodBase.GetCurrentMethod().Name, $"Gender found on GameObject: {actorGender}", eventId);
 
         // Player gender overrides will be handled by a different system.
-        if (speaker.ObjectKind is ObjectKind.Player)
+        if (speaker.ObjectKind is ObjectKind.Pc)
         {
             return actorGender;
         }

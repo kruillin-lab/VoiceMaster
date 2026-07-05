@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Threading.Tasks;
 using Dalamud.Interface.Windowing;
 using VoiceMaster.DataClasses;
 using VoiceMaster.Enums;

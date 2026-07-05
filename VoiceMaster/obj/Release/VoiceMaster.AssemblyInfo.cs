@@ -10,11 +10,11 @@
 using System;
 using System.Reflection;
 
-[assembly: System.Reflection.AssemblyCompanyAttribute("The CombatReborn Team")]
+[assembly: System.Reflection.AssemblyCompanyAttribute("VoiceMaster")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyDescriptionAttribute("A TTS Dalamud Plugin that breaks the silence! For self hosted TTS Services.")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("0.15.0.1")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.15.0.1+af92ff005adad526b91fb72919e6a7c43b701658")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.15.0.1+3a6612f02600e7c5ad7585b891bf799c75be1470")]
 [assembly: System.Reflection.AssemblyProductAttribute("VoiceMaster")]
 [assembly: System.Reflection.AssemblyTitleAttribute("VoiceMaster")]
 [assembly: System.Reflection.AssemblyVersionAttribute("0.15.0.1")]

@@ -350,7 +350,7 @@ public Plugin(
             npcData.Gender = CharacterDataHelper.GetCharacterGender(eventId, speaker, npcData.Race, out var modelBody);
             npcData.Name = TalkTextHelper.CleanUpName(cleanSpeakerName);
 
-            if (npcData.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player)
+            if (npcData.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Pc)
                 npcData.Name = JsonLoaderHelper.GetNpcName(npcData.Name);
 
             if (npcData.Name == "PLAYER")
@@ -359,7 +359,7 @@ public Plugin(
                 npcData.Name = TalkTextHelper.GetBubbleName(speaker, cleanText);
 
             // B+ player identity: try to populate HomeWorld for Players (Name + HomeWorld mapping key).
-            if (npcData.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player)
+            if (npcData.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Pc)
             {
                 // Split formatted names like "Name@World" into Name + HomeWorld when present.
                 var rawName = npcData.Name ?? string.Empty;

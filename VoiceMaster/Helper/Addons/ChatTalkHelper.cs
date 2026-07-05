@@ -1,3 +1,4 @@
+using Dalamud.Game.Chat;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
@@ -19,7 +20,7 @@ namespace VoiceMaster.Helper.Addons
         private record struct ChatMessage(XivChatType Type, SeString Sender, SeString Message);
 
         private readonly Conditions* conditions;
-        private IChatGui.OnMessageDelegate handler;
+        private IChatGui.OnHandleableChatMessageDelegate handler;
 
         public ChatTalkHelper()
         {
@@ -30,16 +31,16 @@ namespace VoiceMaster.Helper.Addons
 
         private void HookIntoChat()
         {
-            handler = new IChatGui.OnMessageDelegate(Handle);
+            handler = new IChatGui.OnHandleableChatMessageDelegate(Handle);
             Plugin.ChatGui.ChatMessage += handler;
         }
-        void Handle(XivChatType type, int timestamp, ref SeString sender, ref SeString message, ref bool handled)
+        void Handle(IHandleableChatMessage chatMessage)
         {
             if (!Plugin.Configuration.Enabled) return;
             if (!Plugin.Configuration.VoiceChat) return;
             if (conditions->WatchingCutscene78 || conditions->WatchingCutscene || conditions->OccupiedInCutSceneEvent || conditions->DutyRecorderPlayback) return;
 
-            var messageObj = new ChatMessage(type, sender, message);
+            var messageObj = new ChatMessage(chatMessage.LogKind, chatMessage.Sender, chatMessage.Message);
             ProcessChatMessage(messageObj);
         }
 

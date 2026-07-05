@@ -1,20 +1,20 @@
 {
   "version": 2,
-  "dgSpecHash": "X3MN2pprxPw=",
+  "dgSpecHash": "8CC70kgIxRs=",
   "success": true,
-  "projectFilePath": "C:\\Users\\kruil\\Documents\\Projects\\output\\VoiceMaster\\VoiceMaster.csproj",
+  "projectFilePath": "/home/kruillin/Projects/Projects/output/VoiceMaster/.claude/worktrees/wonderful-khorana-1847d9/VoiceMaster/VoiceMaster.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\kruil\\.nuget\\packages\\dotnet.reproduciblebuilds\\1.2.39\\dotnet.reproduciblebuilds.1.2.39.nupkg.sha512",
-    "C:\\Users\\kruil\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
-    "C:\\Users\\kruil\\.nuget\\packages\\humanizer.core.de\\2.14.1\\humanizer.core.de.2.14.1.nupkg.sha512",
-    "C:\\Users\\kruil\\.nuget\\packages\\humanizer.core.fr\\2.14.1\\humanizer.core.fr.2.14.1.nupkg.sha512",
-    "C:\\Users\\kruil\\.nuget\\packages\\humanizer.core.ja\\2.14.1\\humanizer.core.ja.2.14.1.nupkg.sha512",
-    "C:\\Users\\kruil\\.nuget\\packages\\jetbrains.annotations\\2024.3.0\\jetbrains.annotations.2024.3.0.nupkg.sha512",
-    "C:\\Users\\kruil\\.nuget\\packages\\managedbass\\4.0.1\\managedbass.4.0.1.nupkg.sha512",
-    "C:\\Users\\kruil\\.nuget\\packages\\microsoft.extensions.dependencyinjection\\9.0.2\\microsoft.extensions.dependencyinjection.9.0.2.nupkg.sha512",
-    "C:\\Users\\kruil\\.nuget\\packages\\microsoft.extensions.dependencyinjection.abstractions\\9.0.2\\microsoft.extensions.dependencyinjection.abstractions.9.0.2.nupkg.sha512",
-    "C:\\Users\\kruil\\.nuget\\packages\\r3\\1.1.13\\r3.1.1.13.nupkg.sha512",
-    "C:\\Users\\kruil\\.nuget\\packages\\reloaded.memory\\7.1.0\\reloaded.memory.7.1.0.nupkg.sha512"
+    "/home/kruillin/.nuget/packages/dotnet.reproduciblebuilds/1.2.39/dotnet.reproduciblebuilds.1.2.39.nupkg.sha512",
+    "/home/kruillin/.nuget/packages/humanizer.core/2.14.1/humanizer.core.2.14.1.nupkg.sha512",
+    "/home/kruillin/.nuget/packages/humanizer.core.de/2.14.1/humanizer.core.de.2.14.1.nupkg.sha512",
+    "/home/kruillin/.nuget/packages/humanizer.core.fr/2.14.1/humanizer.core.fr.2.14.1.nupkg.sha512",
+    "/home/kruillin/.nuget/packages/humanizer.core.ja/2.14.1/humanizer.core.ja.2.14.1.nupkg.sha512",
+    "/home/kruillin/.nuget/packages/jetbrains.annotations/2024.3.0/jetbrains.annotations.2024.3.0.nupkg.sha512",
+    "/home/kruillin/.nuget/packages/managedbass/4.0.1/managedbass.4.0.1.nupkg.sha512",
+    "/home/kruillin/.nuget/packages/microsoft.extensions.dependencyinjection/9.0.2/microsoft.extensions.dependencyinjection.9.0.2.nupkg.sha512",
+    "/home/kruillin/.nuget/packages/microsoft.extensions.dependencyinjection.abstractions/9.0.2/microsoft.extensions.dependencyinjection.abstractions.9.0.2.nupkg.sha512",
+    "/home/kruillin/.nuget/packages/r3/1.1.13/r3.1.1.13.nupkg.sha512",
+    "/home/kruillin/.nuget/packages/reloaded.memory/7.1.0/reloaded.memory.7.1.0.nupkg.sha512"
   ],
   "logs": []
 }

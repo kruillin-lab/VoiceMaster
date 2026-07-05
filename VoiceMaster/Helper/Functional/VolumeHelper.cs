@@ -18,7 +18,7 @@ namespace VoiceMaster.Helper.Functional
             {
                 var soundManager = instance->SoundManager;
                 masterVolume = soundManager->MasterVolume;
-                voiceVolume = soundManager->GetEffectiveVolume(SoundManager.SoundChannel.Voice);
+                voiceVolume = soundManager->Volume[(int)SoundBus.Voice];
                 var isMasterMuted = false;
                 var isVoiceMuted = false;
 

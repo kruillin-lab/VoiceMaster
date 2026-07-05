@@ -13,7 +13,7 @@ namespace VoiceMaster.Helper.DataHelper
 {
     public static class LuminaHelper
     {
-        private static ushort TerritoryRow;
+        private static uint TerritoryRow;
         private static TerritoryType? Territory;
 
         public static TerritoryType? GetTerritory()

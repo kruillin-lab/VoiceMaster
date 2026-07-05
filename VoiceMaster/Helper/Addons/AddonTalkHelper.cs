@@ -62,8 +62,8 @@ public unsafe class AddonTalkHelper
         var eventType = (AtkEventType)eventArgs.AtkEventType;
         var isControllerButtonClick = eventType == AtkEventType.InputReceived && eventData->InputData.InputId == 1;
         var isDialogueAdvancing = 
-            (eventType == AtkEventType.MouseClick && ((byte)eventData->MouseData.Modifier & 0b0001_0000) == 0) || 
-            eventArgs.AtkEventType == (byte)AtkEventType.InputReceived;
+            (eventType == AtkEventType.MouseClick && ((byte)eventData->MouseData.Modifier & 0b0001_0000) == 0) ||
+            eventType == AtkEventType.InputReceived;
 
         if (isControllerButtonClick || isDialogueAdvancing)
             if (Plugin.Configuration.CancelSpeechOnTextAdvance)

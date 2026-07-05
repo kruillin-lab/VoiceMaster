@@ -1,31 +1,30 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\kruil\\Documents\\Projects\\output\\VoiceMaster\\VoiceMaster.csproj": {}
+    "/home/kruillin/Projects/Projects/output/VoiceMaster/.claude/worktrees/wonderful-khorana-1847d9/VoiceMaster/VoiceMaster.csproj": {}
   },
   "projects": {
-    "C:\\Users\\kruil\\Documents\\Projects\\output\\OtterGui\\OtterGui.csproj": {
+    "/home/kruillin/Projects/Projects/output/VoiceMaster/.claude/worktrees/wonderful-khorana-1847d9/OtterGui/OtterGui.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\kruil\\Documents\\Projects\\output\\OtterGui\\OtterGui.csproj",
+        "projectUniqueName": "/home/kruillin/Projects/Projects/output/VoiceMaster/.claude/worktrees/wonderful-khorana-1847d9/OtterGui/OtterGui.csproj",
         "projectName": "OtterGui",
-        "projectPath": "C:\\Users\\kruil\\Documents\\Projects\\output\\OtterGui\\OtterGui.csproj",
-        "packagesPath": "C:\\Users\\kruil\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\kruil\\Documents\\Projects\\output\\OtterGui\\obj\\",
+        "projectPath": "/home/kruillin/Projects/Projects/output/VoiceMaster/.claude/worktrees/wonderful-khorana-1847d9/OtterGui/OtterGui.csproj",
+        "packagesPath": "/home/kruillin/.nuget/packages/",
+        "outputPath": "/home/kruillin/Projects/Projects/output/VoiceMaster/.claude/worktrees/wonderful-khorana-1847d9/OtterGui/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\kruil\\AppData\\Roaming\\NuGet\\NuGet.Config",
-          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+          "/home/kruillin/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net10.0-windows"
         ],
         "sources": {
-          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
-          "net10.0-windows7.0": {
+          "net10.0-windows": {
+            "framework": "net10.0-windows7.0",
             "targetAlias": "net10.0-windows",
             "projectReferences": {}
           }
@@ -43,10 +42,11 @@
           "auditLevel": "low",
           "auditMode": "all"
         },
-        "SdkAnalysisLevel": "10.0.100"
+        "SdkAnalysisLevel": "10.0.300"
       },
       "frameworks": {
-        "net10.0-windows7.0": {
+        "net10.0-windows": {
+          "framework": "net10.0-windows7.0",
           "targetAlias": "net10.0-windows",
           "dependencies": {
             "DotNet.ReproducibleBuilds": {
@@ -79,7 +79,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.102/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "/home/kruillin/.dotnet/sdk/10.0.301/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.CSharp": "(,4.7.32767]",
             "Microsoft.VisualBasic": "(,10.4.32767]",
@@ -357,32 +357,31 @@
         }
       }
     },
-    "C:\\Users\\kruil\\Documents\\Projects\\output\\VoiceMaster\\VoiceMaster.csproj": {
+    "/home/kruillin/Projects/Projects/output/VoiceMaster/.claude/worktrees/wonderful-khorana-1847d9/VoiceMaster/VoiceMaster.csproj": {
       "version": "0.15.0.1",
       "restore": {
-        "projectUniqueName": "C:\\Users\\kruil\\Documents\\Projects\\output\\VoiceMaster\\VoiceMaster.csproj",
+        "projectUniqueName": "/home/kruillin/Projects/Projects/output/VoiceMaster/.claude/worktrees/wonderful-khorana-1847d9/VoiceMaster/VoiceMaster.csproj",
         "projectName": "VoiceMaster",
-        "projectPath": "C:\\Users\\kruil\\Documents\\Projects\\output\\VoiceMaster\\VoiceMaster.csproj",
-        "packagesPath": "C:\\Users\\kruil\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\kruil\\Documents\\Projects\\output\\VoiceMaster\\obj\\",
+        "projectPath": "/home/kruillin/Projects/Projects/output/VoiceMaster/.claude/worktrees/wonderful-khorana-1847d9/VoiceMaster/VoiceMaster.csproj",
+        "packagesPath": "/home/kruillin/.nuget/packages/",
+        "outputPath": "/home/kruillin/Projects/Projects/output/VoiceMaster/.claude/worktrees/wonderful-khorana-1847d9/VoiceMaster/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\kruil\\AppData\\Roaming\\NuGet\\NuGet.Config",
-          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+          "/home/kruillin/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net10.0-windows"
         ],
         "sources": {
-          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
-          "net10.0-windows7.0": {
+          "net10.0-windows": {
+            "framework": "net10.0-windows7.0",
             "targetAlias": "net10.0-windows",
             "projectReferences": {
-              "C:\\Users\\kruil\\Documents\\Projects\\output\\OtterGui\\OtterGui.csproj": {
-                "projectPath": "C:\\Users\\kruil\\Documents\\Projects\\output\\OtterGui\\OtterGui.csproj"
+              "/home/kruillin/Projects/Projects/output/VoiceMaster/.claude/worktrees/wonderful-khorana-1847d9/OtterGui/OtterGui.csproj": {
+                "projectPath": "/home/kruillin/Projects/Projects/output/VoiceMaster/.claude/worktrees/wonderful-khorana-1847d9/OtterGui/OtterGui.csproj"
               }
             }
           }
@@ -400,10 +399,11 @@
           "auditLevel": "low",
           "auditMode": "all"
         },
-        "SdkAnalysisLevel": "10.0.100"
+        "SdkAnalysisLevel": "10.0.300"
       },
       "frameworks": {
-        "net10.0-windows7.0": {
+        "net10.0-windows": {
+          "framework": "net10.0-windows7.0",
           "targetAlias": "net10.0-windows",
           "dependencies": {
             "DotNet.ReproducibleBuilds": {
@@ -456,7 +456,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.102/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "/home/kruillin/.dotnet/sdk/10.0.301/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.CSharp": "(,4.7.32767]",
             "Microsoft.VisualBasic": "(,10.4.32767]",

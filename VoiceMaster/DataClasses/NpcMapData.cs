@@ -49,7 +49,7 @@ namespace VoiceMaster.DataClasses
         {
             var raceString = Race == NpcRaces.Unknown ? RaceStr : Race.ToString();
             var name = Name;
-            if (ObjectKind == ObjectKind.Player && !string.IsNullOrWhiteSpace(HomeWorld) && !Name.Contains("@"))
+            if (ObjectKind == ObjectKind.Pc && !string.IsNullOrWhiteSpace(HomeWorld) && !Name.Contains("@"))
                 name = $"{Name}@{HomeWorld}";
             return $"{Gender} - {raceString} - {name}";
         }
