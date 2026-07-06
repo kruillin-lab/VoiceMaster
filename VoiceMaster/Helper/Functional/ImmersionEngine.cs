@@ -11,7 +11,7 @@ namespace VoiceMaster.Helper.Functional
     /// </summary>
     public class ImmersionEngine
     {
-        private const string DefaultModelId = "inworld-tts-1.5-max";
+        private const string DefaultModelId = "inworld-tts-2";
 
         // Clamp bounds per spec
         private const double MinRate = 0.5;
