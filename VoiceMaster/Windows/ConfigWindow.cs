@@ -28,6 +28,7 @@ public class ConfigWindow : Window, IDisposable
 {
     private readonly FileDialogManager? fileDialogManager;
     private unsafe Camera* camera;
+    private string _cacheClearStatus = "";
     #region Voice Selection
     private List<NpcMapData> filteredNpcs = [];
     private static bool _updateDataNpcs;
@@ -749,6 +750,22 @@ public class ConfigWindow : Window, IDisposable
 
             fileDialogManager!.Draw();
         }
+
+        ImGui.Spacing();
+        var ctrlHeld = ImGui.GetIO().KeyCtrl;
+        using (ImRaii.Disabled(!ctrlHeld))
+        {
+            if (ImGui.Button("Clear audio cache"))
+            {
+                var removed = AudioFileHelper.ClearAllCache(Plugin.Configuration.LocalSaveLocation);
+                _cacheClearStatus = $"Removed {removed} cached file(s).";
+                LogHelper.Info(MethodBase.GetCurrentMethod()!.Name, _cacheClearStatus, new EKEventId(0, TextSource.None));
+            }
+        }
+        ImGui.SameLine();
+        ImGui.TextDisabled(ctrlHeld ? "Deletes all cached audio; lines regenerate next time." : "Hold Ctrl to enable.");
+        if (!string.IsNullOrEmpty(_cacheClearStatus))
+            ImGui.TextUnformatted(_cacheClearStatus);
     }
 
     private unsafe void DrawBubbleSettings()

@@ -304,5 +304,50 @@ public static bool DeleteSpeakerFiles(string localSaveLocation, string speaker)
 
             return false;
         }
+
+        /// <summary>
+        /// Deletes every cached audio file (all speaker subfolders and loose files) but
+        /// keeps the cache root directory so the load path's Directory.Exists gate still
+        /// passes afterward. Returns the number of files removed.
+        /// </summary>
+        public static int ClearAllCache(string localSaveLocation)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(localSaveLocation) || !Directory.Exists(localSaveLocation))
+                    return 0;
+
+                var fileCount = Directory.GetFiles(localSaveLocation, "*", SearchOption.AllDirectories).Length;
+
+                foreach (var dir in Directory.GetDirectories(localSaveLocation))
+                {
+                    try { Directory.Delete(dir, true); }
+                    catch (Exception ex)
+                    {
+                        LogHelper.Error(MethodBase.GetCurrentMethod().Name,
+                            $"Error deleting cache subfolder '{dir}': {ex}", new EKEventId(0, Enums.TextSource.None));
+                    }
+                }
+
+                foreach (var file in Directory.GetFiles(localSaveLocation))
+                {
+                    try { File.Delete(file); }
+                    catch (Exception ex)
+                    {
+                        LogHelper.Error(MethodBase.GetCurrentMethod().Name,
+                            $"Error deleting cache file '{file}': {ex}", new EKEventId(0, Enums.TextSource.None));
+                    }
+                }
+
+                SavedFiles.Clear();
+                return fileCount;
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Error(MethodBase.GetCurrentMethod().Name,
+                    $"Error clearing audio cache: {ex}", new EKEventId(0, Enums.TextSource.None));
+                return 0;
+            }
+        }
     }
 }
