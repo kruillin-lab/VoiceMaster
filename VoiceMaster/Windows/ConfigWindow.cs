@@ -1436,6 +1436,46 @@ public class ConfigWindow : Window, IDisposable
         }
     }
 
+    private void DrawPersonalityEditor(NpcMapData mapData)
+    {
+        var popupId = $"##personality{mapData.ToString()}";
+        var has = !string.IsNullOrWhiteSpace(mapData.Personality);
+        var tooltip = has ? $"Voice personality: {mapData.Personality}" : "Voice personality (TTS-2 steering) — none set";
+        if (ImGuiUtil.DrawDisabledButton($"{FontAwesomeIcon.TheaterMasks.ToIconString()}##persbtn{mapData.ToString()}", new Vector2(25, 25), tooltip, false, true))
+            ImGui.OpenPopup(popupId);
+
+        if (ImGui.BeginPopup(popupId))
+        {
+            ImGui.TextUnformatted($"Voice personality — {mapData.Name}");
+            ImGui.Separator();
+
+            var labels = PersonalityPresets.MenuLabels();
+            var pick = 0;
+            ImGui.SetNextItemWidth(340);
+            if (ImGui.Combo($"##perspreset{mapData.ToString()}", ref pick, labels, labels.Length))
+            {
+                var descriptor = PersonalityPresets.DescriptorForMenuIndex(pick);
+                if (descriptor != null)
+                {
+                    mapData.Personality = descriptor;
+                    mapData.DoNotDelete = true;
+                    Plugin.Configuration.Save();
+                }
+            }
+
+            var pers = mapData.Personality ?? string.Empty;
+            if (ImGui.InputTextMultiline($"##perstext{mapData.ToString()}", ref pers, 300, new Vector2(340, 60)))
+            {
+                mapData.Personality = pers;
+                mapData.DoNotDelete = true;
+                Plugin.Configuration.Save();
+            }
+
+            ImGui.TextDisabled("Describe how this character sounds. Sent as an Inworld\nTTS-2 [speak ...] steering instruction, combined with the\nauto per-line emotion. Empty = emotion only. Needs the\ninworld-tts-2 model. Clear the audio cache after changing.");
+            ImGui.EndPopup();
+        }
+    }
+
     private void DrawVoiceSelectionTable(string dataType, List<NpcMapData> realData, ref List<NpcMapData> filteredData, ref bool updateData, ref bool resetData, ref string filterGender, ref string filterRace, ref string filterName, ref string filterVoice, ref string filterWorld, bool isBubble = false)
     {
         if (filteredData.Count == 0)
@@ -1702,7 +1742,7 @@ public class ConfigWindow : Window, IDisposable
                 }
 
                 ImGui.TableNextColumn();
-                ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+                ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - 30);
 
                 if (mapData.VoicesSelectable.Draw(mapData.Voice?.VoiceName ?? "", out var selectedIndexVoice))
                 {
@@ -1715,6 +1755,8 @@ public class ConfigWindow : Window, IDisposable
                     Plugin.Configuration.Save();
                     LogHelper.Info(MethodBase.GetCurrentMethod()!.Name, $"Updated Voice for {dataType}: {mapData.ToString()} from: {mapData.Voice} to: {newVoiceItem}", new EKEventId(0, TextSource.None));
                 }
+                ImGui.SameLine(0, 4);
+                DrawPersonalityEditor(mapData);
                 ImGui.TableNextColumn();
                 ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
                 var voiceVolume = 1f;

@@ -63,12 +63,18 @@ namespace VoiceMaster.Helper.Functional
                     return "NOPERSON";
 
                 // Prefer the selected backend voice identifier (stable across renames).
-                if (!string.IsNullOrWhiteSpace(s.voice))
-                    return s.voice;
+                var baseKey = !string.IsNullOrWhiteSpace(s.voice) ? s.voice
+                            : !string.IsNullOrWhiteSpace(s.Name) ? s.Name
+                            : "NOPERSON";
 
-                // Fallback to NPC name.
-                if (!string.IsNullOrWhiteSpace(s.Name))
-                    return s.Name;
+                // Personality steers delivery, so it is part of the cache identity: two NPCs
+                // sharing a voice + line but different personalities must not collide. (Emotion
+                // needs no key part — it is a deterministic function of the text, which is the
+                // file name.)
+                if (!string.IsNullOrWhiteSpace(s.Personality))
+                    baseKey += "_p" + StableHash(s.Personality);
+
+                return baseKey;
             }
             catch
             {
@@ -76,6 +82,21 @@ namespace VoiceMaster.Helper.Functional
             }
 
             return "NOPERSON";
+        }
+
+        // Run-stable hash (String.GetHashCode is randomized per-process). FNV-1a/32.
+        private static string StableHash(string value)
+        {
+            unchecked
+            {
+                uint h = 2166136261;
+                foreach (var c in value)
+                {
+                    h ^= c;
+                    h *= 16777619;
+                }
+                return h.ToString("x8");
+            }
         }
 
         public static string VoiceMessageToFileName(string voiceMessage)

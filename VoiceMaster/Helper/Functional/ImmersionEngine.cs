@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using VoiceMaster.DataClasses;
 using VoiceMaster.Enums;
 
@@ -32,6 +33,41 @@ namespace VoiceMaster.Helper.Functional
             /* Solemn  = 6 */ (-0.05, -0.15),
         };
 
+        // Per-line delivery phrases for TTS-2 natural-language steering, indexed by EmotionState.
+        // Neutral contributes no phrase. Kept lowercase/punctuation-light per Inworld guidance.
+        private static readonly string[] EmotionSteer =
+        {
+            /* Neutral = 0 */ "",
+            /* Happy   = 1 */ "cheerfully",
+            /* Angry   = 2 */ "with sharp anger",
+            /* Sad     = 3 */ "sadly in a low heavy tone",
+            /* Fearful = 4 */ "fearfully tense and shaky",
+            /* Excited = 5 */ "with bright excited energy",
+            /* Solemn  = 6 */ "solemnly slow and grave",
+        };
+
+        /// <summary>
+        /// Composes a single bracketed TTS-2 steering instruction from the persistent
+        /// per-NPC personality (Layer 1) and the per-line detected emotion (Layer 2).
+        /// Returns "" when neither contributes, so plain text is sent unchanged.
+        /// </summary>
+        public static string BuildSteering(string personality, EmotionState emotion)
+        {
+            var persona = (personality ?? string.Empty).Trim();
+            var emo = EmotionSteer[(int)emotion];
+
+            if (persona.Length == 0 && emo.Length == 0)
+                return string.Empty;
+
+            var parts = new List<string>();
+            parts.Add(persona.Length > 0 ? "speak as " + persona : "speak");
+            if (emo.Length > 0)
+                parts.Add(emo);
+
+            // One instruction, at the start of the text, lowercase per Inworld best practice.
+            return "[" + string.Join(", ", parts).ToLowerInvariant() + "] ";
+        }
+
         private readonly NpcVoiceProfileStore _store;
 
         public ImmersionEngine(NpcVoiceProfileStore store)
@@ -57,7 +93,9 @@ namespace VoiceMaster.Helper.Functional
             var finalRate = Math.Clamp(profile.SpeakingRate + rateDelta, MinRate, MaxRate);
             var finalTemp = Math.Clamp(profile.Temperature  + tempDelta, MinTemp, MaxTemp);
 
-            return new InworldTtsParams(finalRate, finalTemp, DefaultModelId);
+            var steering = BuildSteering(speaker.Personality, emotion);
+
+            return new InworldTtsParams(finalRate, finalTemp, DefaultModelId, steering);
         }
     }
 }

@@ -19,6 +19,10 @@ namespace VoiceMaster.DataClasses
 
         public bool IsChild { get; set; }
 
+        /// <summary>Free-text Inworld TTS-2 steering descriptor for this character
+        /// (e.g. "a grizzled old warrior, low and gravelly"). Empty = emotion-only steering.</summary>
+        public string Personality { get; set; } = string.Empty;
+
         public string voice = "";
         internal VoiceMasterVoice? Voice
         {

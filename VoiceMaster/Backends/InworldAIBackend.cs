@@ -80,7 +80,7 @@ namespace VoiceMaster.Backend
 
                 var payload = new JObject
                 {
-                    ["text"] = message.Text,
+                    ["text"] = ttsParams.SteeringPrefix + message.Text,
                     ["voiceId"] = voiceId,
                     ["modelId"] = ttsParams.ModelId,
                     ["audioConfig"] = new JObject
@@ -196,7 +196,7 @@ namespace VoiceMaster.Backend
 
                 var payload = new JObject
                 {
-                    ["text"] = message.Text,
+                    ["text"] = ttsParams.SteeringPrefix + message.Text,
                     ["voiceId"] = voiceId,
                     ["audioConfig"] = new JObject
                     {
