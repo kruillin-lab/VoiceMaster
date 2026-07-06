@@ -59,4 +59,21 @@
     
     <Message Text="✅ Deployed to: $(DevPluginPath)" Importance="high" />
   </Target>
+
+  <!-- Auto-deploy on Linux/macOS (XIVLauncher.Core), where APPDATA is unset. Only fires
+       when an .xlcore dev-plugins layout already exists, so CI/other boxes are untouched. -->
+  <Target Name="DeployToDevPluginsXlcore" AfterTargets="Build"
+          Condition="'$(APPDATA)' == '' and Exists('$(HOME)/.xlcore/devPlugins')">
+    <PropertyGroup>
+      <XlcorePluginPath>$(HOME)/.xlcore/devPlugins/VoiceMaster</XlcorePluginPath>
+    </PropertyGroup>
+
+    <Message Text="Deploying VoiceMaster to XIVLauncher.Core dev plugins folder..." Importance="high" />
+    <MakeDir Directories="$(XlcorePluginPath)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(XlcorePluginPath)" ContinueOnError="true" />
+    <Copy SourceFiles="$(TargetDir)VoiceMaster.json" DestinationFolder="$(XlcorePluginPath)" ContinueOnError="true" />
+    <Copy SourceFiles="$(TargetDir)bass.dll" DestinationFolder="$(XlcorePluginPath)"
+          Condition="Exists('$(TargetDir)bass.dll')" ContinueOnError="true" />
+    <Message Text="✅ Deployed to: $(XlcorePluginPath)" Importance="high" />
+  </Target>
 </Project>

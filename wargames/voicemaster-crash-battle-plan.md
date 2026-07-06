@@ -20,6 +20,48 @@ aliases: []
 
 ---
 
+## Execution status (post-fight — updated 2026-07-06)
+
+All three code fixes **LANDED** in commit `5a16dad` ("fix: harden VoiceMaster
+startup and audio loading") and were then **adversarially verified** by a
+submodel pass. The tree builds green (0 errors). Recon items settled:
+
+| Item | Status | Settlement |
+|------|--------|-----------|
+| **F1** bass.dll deploy | ✅ FIXED | `VoiceMaster.csproj` deploy target now copies `bass.dll` under `Condition="Exists(...)"`, so it travels with the DLL without reintroducing the historical `MSB3030` break. |
+| **F2** BASS init isolation | ✅ FIXED | `EnsureInit()` returns `bool` + `_initFailed` latch (no more `throw`); both callers honor the `false` return; `PlayingHelper.Setup()` wrapped in try/catch; `PlayStream` returns `Guid.Empty` and `WorkPlayingQueue` skips + disposes the stream. Construction can no longer abort on a dead audio device. |
+| **F3** startup data resilience | ✅ FIXED | `JsonLoaderHelper.Initialize` wrapped in try/catch; the fire-and-forget task at `Plugin.cs:156` now has an `OnlyOnFaulted` continuation. |
+| **R0** source root | ✅ SETTLED | Source now lives at the mission path `/home/kruillin/Projects/Projects/VoiceMaster` (repo was relocated + consolidated). |
+| **R3** do map consumers tolerate empty? | ✅ SETTLED → F3 stays MEDIUM | All consumers are empty-safe: `NpcDataHelper.cs:18` (`Find()!=null`), `CharacterDataHelper.cs:67-69` (null-checked `Find`), `:115` (`TryGetValue` + `else`), `TalkTextHelper.cs:267` (empty-`Emoticons` → no-op regex inside try/catch). **No consumer guard was needed.** |
+| **R1** does bass.dll ship on real installs? | ✅ SETTLED + FIXED | Verification found the F1 deploy target is **Windows-only** (`Condition="'$(APPDATA)' != ''"`), so on this Linux/XIVLauncher.Core box `bass.dll` was **never auto-deployed** — the copy present was a manual `cp`. Closed by adding a second target `DeployToDevPluginsXlcore` (fires when `$(APPDATA)==''` and `~/.xlcore/devPlugins` exists) that copies dll+json+bass.dll to `$(HOME)/.xlcore/devPlugins/VoiceMaster`. **Proven:** cleared the folder, rebuilt, both files auto-landed. |
+| **R2** does BASS init under Wine? | ⏳ OPEN — MANUAL | Answerable only by launching the game; fold into **M2**. If BASS inits fine, F2 is defense-in-depth; if not, F2 is what turns the crash into a soft degrade. |
+
+### Adversarial-verify residuals (found real, judged out-of-scope / non-crash)
+
+- **F2 — `Update3DFactors` bypasses `EnsureInit`** (`PlayingHelper.cs:46-53`,
+  reachable from the ConfigWindow 3D-range slider). Calls `Bass.Set3DFactors`/
+  `Bass.Apply3D` on a possibly-dead device — but ManagedBass 4.0.1 has no
+  `ThrowOnError`, so it's a silent `false`-returning no-op, **not a crash**.
+  Defense-in-depth only; left as-is.
+- **F3 — `LoadVoiceNames` accepts a literal `"null"` body** (`JsonLoaderHelper.cs:129-168`):
+  `Deserialize<List<VoiceMap>>("null")` yields a null `VoiceMaps`; the log uses
+  `?.Count` so no NRE, but downstream reads of a *null* (vs empty) `VoiceMaps`
+  are less safe than the empty-list case R3 cleared. Low likelihood (server would
+  have to return the string `null`); noted, not fixed.
+- **F3 — `ConfigWindow.ReloadRemoteMappings()` races the static maps** (no lock
+  around a synchronous re-`Initialize` from a UI click). Pre-existing; a user
+  clicking reload mid-dialogue could read a half-swapped map. Out of the top-3
+  crash scope.
+
+**What remains for the user:** only the in-game `MANUAL VERIFY` runs **M2–M3**
+(§5). R1 is now closed in code; M1 becomes a confirmation, not a discovery.
+Everything a headless executor can do is done and verified.
+
+The move-by-move route below is preserved as the executable record and as the
+re-run procedure if the fixes ever regress.
+
+---
+
 ## 0. Theatre map (what recon settled, so you don't re-fight it)
 
 **The mission brief names the repo as `/home/kruillin/Projects/Projects/VoiceMaster`.
