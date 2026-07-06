@@ -517,24 +517,21 @@ namespace VoiceMaster.Helper.Functional
                 return true;
             }
 
-            string command = "which";
-            string arg = "nvcc";
-
-            var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = command,
-                    Arguments = arg,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
-            };
-
             try
             {
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "which",
+                        Arguments = "nvcc",
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+
                 process.Start();
                 string output = process.StandardOutput.ReadToEnd();
                 process.WaitForExit();

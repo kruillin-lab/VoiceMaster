@@ -161,7 +161,14 @@ public Plugin(
         DetectLanguageHelper.Initialize();
         BackendHelper.Initialize(Configuration.BackendSelection);
         CommandHelper.Initialize();
-        AlltalkInstanceHelper.Initialize();
+        try
+        {
+            AlltalkInstanceHelper.Initialize();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "AlltalkInstanceHelper.Initialize failed; Alltalk local-instance features disabled for this session");
+        }
         LipSyncHelper = new LipSyncHelper();
         AddonTalkHelper = new AddonTalkHelper();
         AddonBattleTalkHelper = new AddonBattleTalkHelper();
