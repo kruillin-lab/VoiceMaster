@@ -7,6 +7,7 @@ using Dalamud.Game;
 using VoiceMaster.Enums;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using VoiceMaster.DataClasses;
 using System.Linq;
 using Dalamud.Game.Text.SeStringHandling;
@@ -146,6 +147,7 @@ public Plugin(
 
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         Configuration.Initialize(PluginInterface);
+        MigrateAudioCacheLocation();
         pluginInterface.UiBuilder.DisableCutsceneUiHide = !Configuration.HideUiInCutscenes;
         ConfigWindow = new ConfigWindow();
         AlltalkInstanceWindow = new AlltalkInstanceWindow();
@@ -212,6 +214,42 @@ public Plugin(
         catch (Exception e)
         {
             LogHelper.Error(MethodBase.GetCurrentMethod().Name, $"Error while starting voice inference: {e}", new EKEventId(0, TextSource.None));
+        }
+    }
+
+    /// <summary>
+    /// Ensures the local audio cache points at a usable, cross-platform location.
+    /// The legacy default was a Windows/Alltalk path (C:\alltalk_tts\LocalSaves) that
+    /// never exists on Linux/macOS, silently disabling the cache. When the path is that
+    /// legacy value or empty, relocate it under the per-plugin config dir and enable the
+    /// cache (a broken/empty path means it was never functional, so this is a pure gain).
+    /// </summary>
+    private void MigrateAudioCacheLocation()
+    {
+        try
+        {
+            var loc = Configuration.LocalSaveLocation;
+            var isLegacyOrEmpty = string.IsNullOrWhiteSpace(loc)
+                || loc.Equals(@"C:\alltalk_tts\LocalSaves", StringComparison.OrdinalIgnoreCase);
+
+            if (!isLegacyOrEmpty)
+                return;
+
+            Configuration.LocalSaveLocation = Path.Combine(PluginInterface.GetPluginConfigDirectory(), "AudioCache");
+            Configuration.CreateMissingLocalSaveLocation = true;
+            Configuration.SaveToLocal = true;
+            Configuration.LoadFromLocalFirst = true;
+            Configuration.Save();
+
+            // Create the dir now so the load path (gated on Directory.Exists) works from the
+            // very first cached line instead of logging "location doesn't exist" until a save.
+            Directory.CreateDirectory(Configuration.LocalSaveLocation);
+
+            Log.Information($"Audio cache location migrated to: {Configuration.LocalSaveLocation} (caching enabled)");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to migrate audio cache location");
         }
     }
 

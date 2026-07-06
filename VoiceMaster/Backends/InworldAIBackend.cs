@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Pipelines;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -66,9 +65,9 @@ namespace VoiceMaster.Backend
 
         // ---------------------------------------------------------------------------
         // Streaming path: POST /tts/v1/voice:stream
-        // Returns a Pipe reader stream that audio engine can consume immediately.
-        // Chunks arrive as NDJSON lines; each decoded chunk is raw PCM (WAV header
-        // stripped) written into the pipe as it arrives.
+        // Drains the NDJSON response (each line's decoded chunk is raw PCM with the
+        // WAV header stripped) into a seekable MemoryStream, then returns it so the
+        // audio can be both played and saved to the local cache.
         // ---------------------------------------------------------------------------
         private async Task<Stream> GenerateStreamingAsync(EKEventId eventId, VoiceMessage message, string voiceId)
         {
@@ -112,96 +111,68 @@ namespace VoiceMaster.Backend
                 LogHelper.Info(MethodBase.GetCurrentMethod().Name,
                     $"Streaming TTS started for: {message.Text[..Math.Min(40, message.Text.Length)]}", eventId);
 
-                // Create a pipe. We write decoded PCM into Writer; caller reads from Reader.
-                var pipe = new Pipe();
+                // Buffer-then-play: fully drain the NDJSON response into a seekable
+                // MemoryStream of raw PCM. A live one-shot pipe stream cannot be re-read,
+                // so it could never be saved to the local cache; a seekable buffer can be
+                // both played AND written to disk (see AudioFileHelper/PlayingHelper cache).
+                var pcmBuffer = new MemoryStream();
+                int totalBytes = 0;
+                int chunkCount = 0;
 
-                // Background task: read NDJSON lines and write PCM chunks to pipe.
-                var pumpTask = Task.Run(async () =>
+                using (response)
+                await using (var bodyStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
+                using (var reader = new StreamReader(bodyStream, Encoding.UTF8))
                 {
-                    bool firstChunk = true;
-                    int totalBytes = 0;
-                    int chunkCount = 0;
-
-                    try
+                    string line;
+                    while ((line = await reader.ReadLineAsync().ConfigureAwait(false)) != null)
                     {
-                        using (response)
-                        await using (var bodyStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
-                        using (var reader = new StreamReader(bodyStream, Encoding.UTF8))
+                        if (string.IsNullOrWhiteSpace(line))
+                            continue;
+
+                        try
                         {
-                            string line;
-                            while ((line = await reader.ReadLineAsync().ConfigureAwait(false)) != null)
-                            {
-                                if (string.IsNullOrWhiteSpace(line))
-                                    continue;
+                            var json = JObject.Parse(line);
+                            var audioBase64 = json["result"]?["audioContent"]?.ToString();
 
-                                try
-                                {
-                                    var json = JObject.Parse(line);
-                                    var audioBase64 = json["result"]?["audioContent"]?.ToString();
+                            if (string.IsNullOrEmpty(audioBase64))
+                                continue;
 
-                                    if (string.IsNullOrEmpty(audioBase64))
-                                        continue;
+                            var chunkBytes = Convert.FromBase64String(audioBase64);
 
-                                    var chunkBytes = Convert.FromBase64String(audioBase64);
+                            // Per Inworld API docs: with LINEAR16 streaming, EVERY chunk
+                            // contains a complete WAV header. We need raw PCM, so strip the
+                            // WAV header from every chunk (matches the blocking path, which
+                            // returns headerless 24kHz/16-bit/mono PCM the engine plays with
+                            // its default format).
+                            var pcmBytes = StripWavHeader(chunkBytes);
 
-                                    // Per Inworld API docs: with LINEAR16 streaming, EVERY chunk
-                                    // contains a complete WAV header. We need raw PCM for BASS,
-                                    // so strip the WAV header from every chunk.
-                                    var pcmBytes = StripWavHeader(chunkBytes);
+                            if (pcmBytes == null || pcmBytes.Length == 0)
+                                continue;
 
-                                    if (pcmBytes == null || pcmBytes.Length == 0)
-                                        continue;
-
-                                    // On the very first chunk, write a synthetic WAV header so
-                                    // the audio engine knows the format (24kHz, 16-bit mono PCM).
-                                    if (firstChunk)
-                                    {
-                                        firstChunk = false;
-                                        // We return raw PCM without a header to match the existing
-                                        // engine behaviour (same as the blocking path which strips
-                                        // the WAV header before returning).
-                                    }
-
-                                    chunkCount++;
-                                    totalBytes += pcmBytes.Length;
-
-                                    var memory = pipe.Writer.GetMemory(pcmBytes.Length);
-                                    pcmBytes.AsSpan().CopyTo(memory.Span);
-                                    pipe.Writer.Advance(pcmBytes.Length);
-
-                                    var flushResult = await pipe.Writer.FlushAsync().ConfigureAwait(false);
-                                    if (flushResult.IsCompleted || flushResult.IsCanceled)
-                                        break;
-                                }
-                                catch (Exception lineEx)
-                                {
-                                    LogHelper.Error(MethodBase.GetCurrentMethod().Name,
-                                        $"Error processing NDJSON line: {lineEx.Message}", eventId);
-                                }
-                            }
+                            chunkCount++;
+                            totalBytes += pcmBytes.Length;
+                            pcmBuffer.Write(pcmBytes, 0, pcmBytes.Length);
                         }
-
-                        LogHelper.Info(MethodBase.GetCurrentMethod().Name,
-                            $"Streaming TTS complete: {chunkCount} chunks, {totalBytes} bytes PCM", eventId);
-                        await pipe.Writer.CompleteAsync().ConfigureAwait(false);
+                        catch (Exception lineEx)
+                        {
+                            LogHelper.Error(MethodBase.GetCurrentMethod().Name,
+                                $"Error processing NDJSON line: {lineEx.Message}", eventId);
+                        }
                     }
-                    catch (Exception ex)
-                    {
-                        LogHelper.Error(MethodBase.GetCurrentMethod().Name,
-                            $"Streaming TTS background task error: {ex}", eventId);
-                        await pipe.Writer.CompleteAsync(ex).ConfigureAwait(false);
-                    }
-                });
+                }
 
-                pumpTask.ContinueWith(t =>
+                LogHelper.Info(MethodBase.GetCurrentMethod().Name,
+                    $"Streaming TTS complete: {chunkCount} chunks, {totalBytes} bytes PCM", eventId);
+
+                if (totalBytes == 0)
                 {
-                    LogHelper.Error(MethodBase.GetCurrentMethod().Name,
-                        $"Streaming TTS pump task faulted: {t.Exception}", eventId);
-                }, TaskContinuationOptions.OnlyOnFaulted);
+                    pcmBuffer.Dispose();
+                    return null;
+                }
 
-                // Return the reader side immediately — audio engine starts consuming
-                // as soon as the first PCM bytes are written above.
-                return pipe.Reader.AsStream();
+                // Rewind so both the audio engine and the local-cache saver read from the start.
+                pcmBuffer.Position = 0;
+                return pcmBuffer;
             }
             catch (Exception ex)
             {

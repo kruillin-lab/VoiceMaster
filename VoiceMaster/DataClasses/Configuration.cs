@@ -35,10 +35,12 @@ public class Configuration : IPluginConfiguration
     public bool RemoveStutters { get; set; } = true;
     public bool HideUiInCutscenes { get; set; } = true;
     public LogConfig logConfig { get; set; } = new LogConfig();
-    public bool SaveToLocal { get; set; } = false;
-    public bool LoadFromLocalFirst { get; set; } = false;
-    public string LocalSaveLocation { get; set; } = @"C:\alltalk_tts\LocalSaves";
-    public bool CreateMissingLocalSaveLocation { get; set; } = false;
+    public bool SaveToLocal { get; set; } = true;
+    public bool LoadFromLocalFirst { get; set; } = true;
+    // Empty by default; resolved to a cross-platform per-plugin cache dir at startup
+    // (Plugin.MigrateAudioCacheLocation). The legacy Windows/Alltalk path is migrated too.
+    public string LocalSaveLocation { get; set; } = "";
+    public bool CreateMissingLocalSaveLocation { get; set; } = true;
     public bool VoiceRetainers { get; set; } = false;
     public bool VoiceBubble { get; set; } = false;
     public bool VoiceBubblesInCity { get; set; } = false;
