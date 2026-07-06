@@ -153,7 +153,9 @@ public Plugin(
         DialogExtraOptionsWindow = new DialogExtraOptionsWindow();
 
         LogHelper.Initialize(log);
-        _ = Task.Run(() => JsonLoaderHelper.Initialize(ClientState.ClientLanguage));
+        _ = Task.Run(() => JsonLoaderHelper.Initialize(ClientState.ClientLanguage))
+            .ContinueWith(t => LogHelper.Error(nameof(JsonLoaderHelper.Initialize), $"Startup NPC data task failed: {t.Exception}", new EKEventId(0, TextSource.None)),
+                          TaskContinuationOptions.OnlyOnFaulted);
         DetectLanguageHelper.Initialize();
         BackendHelper.Initialize(Configuration.BackendSelection);
         CommandHelper.Initialize();

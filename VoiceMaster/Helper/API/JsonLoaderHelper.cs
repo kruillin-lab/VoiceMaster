@@ -30,10 +30,17 @@ namespace VoiceMaster.Helper.API
         public static List<VoiceMap> VoiceMaps = new List<VoiceMap>();
         public static void Initialize(ClientLanguage language)
         {
-            LoadModelsToRaceMap();
-            LoadModelsToGenderMap();
-            LoadEmoticons();
-            LoadVoiceNames(language);
+            try
+            {
+                LoadModelsToRaceMap();
+                LoadModelsToGenderMap();
+                LoadEmoticons();
+                LoadVoiceNames(language);
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Error(MethodBase.GetCurrentMethod().Name, $"Unexpected error while loading startup NPC data: {ex}", new EKEventId(0, TextSource.None));
+            }
         }
 
         private static WebRequest CreateRequest(string url)

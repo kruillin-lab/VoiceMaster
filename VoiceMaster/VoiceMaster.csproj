@@ -22,9 +22,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="bass.dll">
+    <Content Include="bass.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
+    </Content>
     <None Update="Resources\VoiceMaster.png">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </None>
@@ -54,7 +54,8 @@
     <!-- Copy plugin files -->
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(DevPluginPath)" ContinueOnError="true" />
     <Copy SourceFiles="$(TargetDir)VoiceMaster.json" DestinationFolder="$(DevPluginPath)" ContinueOnError="true" />
-    <!-- Bass.dll copy removed to avoid build failure -->
+    <Copy SourceFiles="$(TargetDir)bass.dll" DestinationFolder="$(DevPluginPath)"
+          Condition="Exists('$(TargetDir)bass.dll')" ContinueOnError="true" />
     
     <Message Text="✅ Deployed to: $(DevPluginPath)" Importance="high" />
   </Target>

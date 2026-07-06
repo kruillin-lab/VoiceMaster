@@ -151,6 +151,12 @@ namespace VoiceMaster.Helper.Functional
             // For dialogue windows and most non-positional sources, play in 2D.
             bool use3D = queueItem.Source == TextSource.AddonBubble;
             queueItem.StreamId = AudioEngine.PlayStream(queueItem.Stream, channels: 1, use3D: use3D, initialPosition: new Vector3D(5,0,2));
+            if (queueItem.StreamId == Guid.Empty)
+            {
+                LogHelper.Error(MethodBase.GetCurrentMethod().Name, "Audio playback skipped because the audio engine is unavailable.", queueItem.EventId);
+                try { queueItem.Stream.Dispose(); } catch { }
+                return;
+            }
             CurrentlyPlayingDictionary.Add(queueItem.StreamId, queueItem);
             
             if (queueItem.Source == TextSource.AddonTalk || queueItem.Source == TextSource.VoiceTest)

@@ -24,7 +24,14 @@ namespace VoiceMaster.Helper.API
         {
             Rand = new Random(Guid.NewGuid().GetHashCode());
             SetBackendType(backendType);
-            PlayingHelper.Setup();
+            try
+            {
+                PlayingHelper.Setup();
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Error(MethodBase.GetCurrentMethod().Name, $"Failed to initialize audio playback: {ex}", new EKEventId(0, TextSource.None));
+            }
         }
 
         public static async void SetBackendType(TTSBackends backendType)

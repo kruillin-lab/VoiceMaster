@@ -11,6 +11,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using ManagedBass;
@@ -31,6 +32,7 @@ public sealed class Live3DAudioEngine : IDisposable
 
     readonly int _deviceIndex;
     bool _inited;
+    bool _initFailed;
 
     float _distanceFactor = 1f;
     float _dopplerFactor = 1f;
@@ -54,7 +56,7 @@ public sealed class Live3DAudioEngine : IDisposable
     public void ConfigureListener(Vector3D position, Vector3D front, Vector3D top,
                                   float distanceFactor = 1f, float rolloffFactor = 1f, float dopplerFactor = 1f)
     {
-        EnsureInit();
+        if (!EnsureInit()) return;
         _distanceFactor = distanceFactor;
         _dopplerFactor = dopplerFactor;
 
@@ -172,7 +174,7 @@ public sealed class Live3DAudioEngine : IDisposable
                            Func<Vector3D>? positionProvider = null,
                            int pollIntervalMs = 15)
     {
-        EnsureInit();
+        if (!EnsureInit()) return Guid.Empty;
         if (use3D && channels != 1) throw new InvalidOperationException("3D benötigt Mono (1 Kanal).");
 
         pollIntervalMs = Math.Min(pollIntervalMs, _listenerIntervalMs);
@@ -202,9 +204,10 @@ public sealed class Live3DAudioEngine : IDisposable
         if (_sources.TryGetValue(id, out var s)) s.Set3DSourcePoller(provider, intervalMs);
     }
 
-    void EnsureInit()
+    bool EnsureInit()
     {
-        if (_inited) return;
+        if (_initFailed) return false;
+        if (_inited) return true;
 
         // robustere globale Audio-Buffering-Settings
         // Choppy/crispy playback is almost always an underrun problem on some devices.
@@ -215,9 +218,14 @@ public sealed class Live3DAudioEngine : IDisposable
 
         if (!Bass.Init(_deviceIndex, 48000, DeviceInitFlags.Default | DeviceInitFlags.Device3D) &&
             Bass.LastError != Errors.Already)
-            throw new InvalidOperationException($"Bass.Init failed: {Bass.LastError}");
+        {
+            _initFailed = true;
+            LogHelper.Error(MethodBase.GetCurrentMethod().Name, $"Bass.Init failed: {Bass.LastError}; audio playback disabled for this session.", new EKEventId(0, TextSource.None));
+            return false;
+        }
 
         _inited = true;
+        return true;
     }
 
     internal void OnSourceEnded(Guid id)
