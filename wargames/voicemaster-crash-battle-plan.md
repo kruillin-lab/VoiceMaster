@@ -85,7 +85,7 @@ mission path.
 ### MOVE 1 — Establish the baseline (read-only)
 
 ```bash
-cd /home/kruillin/Projects/Projects/output/VoiceMaster
+cd /home/kruillin/Projects/Projects/VoiceMaster
 git status --short
 git log --oneline -6
 DALAMUD_HOME=~/.xlcore/dalamud/Hooks/dev ~/.dotnet/dotnet build VoiceMaster/VoiceMaster.csproj -c Release 2>&1 | tail -5
@@ -273,7 +273,7 @@ grep -rn 'ModelsToRaceMap\|VoiceMaps\|ModelGenderMap' VoiceMaster/Helper/Data/Np
 
 ```bash
 DALAMUD_HOME=~/.xlcore/dalamud/Hooks/dev ~/.dotnet/dotnet build VoiceMaster/VoiceMaster.csproj -c Release 2>&1 | tail -5
-git -C /home/kruillin/Projects/Projects/output/VoiceMaster diff --stat
+git -C /home/kruillin/Projects/Projects/VoiceMaster diff --stat
 ```
 - **Expected observation:** `Build succeeded.`, `0 Error(s)`, warning count **≤ 442**
   (you should not have added warnings; a new `async`/`await` or unobserved-task
