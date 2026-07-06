@@ -53,6 +53,7 @@ public class ConfigWindow : Window, IDisposable
     private int _addPlayerVoiceIndex = 0;
     private int _addPlayerRaceIndex = 0;
     private int _addPlayerGenderIndex = 0;
+    private string _addPersonality = "";
 
     private string filterVoicePlayers = "";
     private List<NpcMapData> filteredBubbles = [];
@@ -1010,6 +1011,20 @@ public class ConfigWindow : Window, IDisposable
                         ImGui.SetNextItemWidth(260f);
                         ImGui.Combo("Voice##EKAddPlayerVoice", ref _addPlayerVoiceIndex, voiceArrAdd, voiceArrAdd.Length);
 
+                        // Personality (TTS-2 steering): preset picker fills the editable text.
+                        var addPersLabels = PersonalityPresets.MenuLabels();
+                        var addPersPick = 0;
+                        ImGui.SetNextItemWidth(220f);
+                        if (ImGui.Combo("Personality##EKAddPlayerPersPreset", ref addPersPick, addPersLabels, addPersLabels.Length))
+                        {
+                            var addPersDesc = PersonalityPresets.DescriptorForMenuIndex(addPersPick);
+                            if (addPersDesc != null)
+                                _addPersonality = addPersDesc;
+                        }
+                        ImGui.SameLine();
+                        ImGui.SetNextItemWidth(320f);
+                        ImGui.InputText("##EKAddPlayerPersText", ref _addPersonality, 300);
+
                         ImGui.SameLine();
                         if (ImGuiUtil.DrawDisabledButton($"{FontAwesomeIcon.Plus.ToIconString()}##EKAddPlayerButton", new Vector2(25, 25), "Add player mapping", false, true))
                         {
@@ -1048,6 +1063,7 @@ public class ConfigWindow : Window, IDisposable
                                     existing.HomeWorld = homeWorld;
                                     existing.Gender = _addPlayerGenderIndex == 1 ? Genders.Male : (_addPlayerGenderIndex == 2 ? Genders.Female : Genders.None);
                                     existing.Race = Enum.TryParse<NpcRaces>(playableRaceNames[_addPlayerRaceIndex], out var parsedRace2) ? parsedRace2 : NpcRaces.Unknown;
+                                    existing.Personality = _addPersonality?.Trim() ?? string.Empty;
                                     existing.RefreshSelectable();
                                 }
                                 else
@@ -1060,6 +1076,7 @@ public class ConfigWindow : Window, IDisposable
                                         Gender = _addPlayerGenderIndex == 1 ? Genders.Male : (_addPlayerGenderIndex == 2 ? Genders.Female : Genders.None),
                                         Race = Enum.TryParse<NpcRaces>(playableRaceNames[_addPlayerRaceIndex], out var parsedRace) ? parsedRace : NpcRaces.Unknown,
                                         RaceStr = string.Empty,
+                                        Personality = _addPersonality?.Trim() ?? string.Empty,
                                         IsChild = false,
                                         IsEnabled = true,
                                         IsEnabledBubble = true,
