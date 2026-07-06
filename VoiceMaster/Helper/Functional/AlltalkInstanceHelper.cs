@@ -31,7 +31,7 @@ namespace VoiceMaster.Helper.Functional
         private static Process? InstanceProcess;
         private static bool InstanceProcessIsRunning;
 
-        private static readonly char[] ShellMetaCharacters = { '"', '\'', '`', '$', '&', '|', ';', '<', '>', '\n', '\r' };
+        private static readonly char[] ShellMetaCharacters = { '"', '`', '$', '\n', '\r' };
 
         private static bool IsSafeInstallPath(string installFolder)
         {
@@ -228,7 +228,15 @@ namespace VoiceMaster.Helper.Functional
                             {
                                 LogHelper.Error("Install - PC", $"Error while marking atsetup.sh executable: {ex}", eventId);
                             }
-                            InstallProcess.StartInfo.FileName = atsetupScript;
+                            if (File.Exists("/usr/bin/setsid"))
+                            {
+                                InstallProcess.StartInfo.FileName = "/usr/bin/setsid";
+                                InstallProcess.StartInfo.ArgumentList.Add(atsetupScript);
+                            }
+                            else
+                            {
+                                InstallProcess.StartInfo.FileName = atsetupScript;
+                            }
                             InstallProcess.StartInfo.ArgumentList.Add("-silent");
                         }
 

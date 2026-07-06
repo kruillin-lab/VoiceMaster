@@ -378,6 +378,13 @@ namespace VoiceMaster.Helper.Functional
 
             try
             {
+                PlayingQueueThread.Join(TimeSpan.FromSeconds(2));
+                RequestingQueueThread.Join(TimeSpan.FromSeconds(2));
+            }
+            catch { }
+
+            try
+            {
                 AudioEngine.Dispose();
             }
             catch { }

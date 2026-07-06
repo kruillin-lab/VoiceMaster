@@ -25,7 +25,7 @@ namespace VoiceMaster.DataClasses
             get => NpcDataHelper.GetVoiceByBackendVoice(voice);
             set => voice = value != null ? value.BackendVoice : string.Empty;
         }
-        public BackendVoiceItem voiceItem { get; set; } = new();
+        public BackendVoiceItem? voiceItem { get; set; }
 
         public bool DoNotDelete { get; set; }
         public bool IsEnabled { get; set; } = true;

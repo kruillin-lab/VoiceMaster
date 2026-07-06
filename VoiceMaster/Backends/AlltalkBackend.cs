@@ -178,9 +178,9 @@ namespace VoiceMaster.Backend
             LogHelper.Info(MethodBase.GetCurrentMethod().Name, "Reloading Alltalk Service", eventId);
             try
             {
-                var uriBuilder = new UriBuilder(Plugin.Configuration.Alltalk.BaseUrl) { Path = Plugin.Configuration.Alltalk.ReloadPath + reloadModel };
+                var reloadUri = new Uri(new Uri(Plugin.Configuration.Alltalk.BaseUrl), Plugin.Configuration.Alltalk.ReloadPath + reloadModel);
                 var content = new StringContent("");
-                using var res = await SharedHttpClient.PostAsync(uriBuilder.Uri, content).ConfigureAwait(false);
+                using var res = await SharedHttpClient.PostAsync(reloadUri, content).ConfigureAwait(false);
                 return true;
             }
             catch (Exception ex)

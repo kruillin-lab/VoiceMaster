@@ -509,6 +509,7 @@ public Plugin(
         ServiceContainer?.Dispose();
         
         DetectLanguageHelper.Dispose();
+        LipSyncHelper.Dispose();
         PlayingHelper.Dispose();
         SoundHelper.Dispose();
         AddonTalkHelper.Dispose();

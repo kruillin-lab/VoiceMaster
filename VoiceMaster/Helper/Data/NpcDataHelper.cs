@@ -82,8 +82,8 @@ namespace VoiceMaster.Helper.Data
         {
             if (oldVoice == null)
             {
-                var oldPlayerMapData = Plugin.Configuration.MappedPlayers.FindAll(p => p.voiceItem != null);
-                var oldNpcMapData = Plugin.Configuration.MappedNpcs.FindAll(p => p.voiceItem != null);
+                var oldPlayerMapData = Plugin.Configuration.MappedPlayers.FindAll(p => p.voiceItem?.Voice != null);
+                var oldNpcMapData = Plugin.Configuration.MappedNpcs.FindAll(p => p.voiceItem?.Voice != null);
 
                 if (oldPlayerMapData.Count > 0 || oldNpcMapData.Count > 0)
                 {
