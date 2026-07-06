@@ -23,27 +23,28 @@ aliases: []
 ## 0. Theatre map (what recon settled, so you don't re-fight it)
 
 **The mission brief names the repo as `/home/kruillin/Projects/Projects/VoiceMaster`.
-That directory is a docs/planning shell — it has no plugin source.** It is not
-even its own git repo (`git rev-parse --show-toplevel` there returns the parent
-`/home/kruillin/Projects/Projects`). It holds AGENTS.md, ICM stages,
-`Implementation/` (reference snippets that were never the live build), and this
-`wargames/` folder.
+That is now the real, buildable plugin repo.** Earlier recon found this path was
+only a docs/planning shell and that the live source was in
+`/home/kruillin/Projects/Projects/output/VoiceMaster`; the shell docs were then
+merged into the clean hardened source repo and the final clone was placed at the
+mission path.
 
-**The real, buildable plugin source lives in a separate git repo:**
+**Current source facts:**
 
-- Repo root: `/home/kruillin/Projects/Projects/output/VoiceMaster`
+- Repo root: `/home/kruillin/Projects/Projects/VoiceMaster`
 - Active branch (post-hardening): `claude/wonderful-khorana-1847d9`
 - The `VoiceMaster/` project folder and the sibling `OtterGui/` project are both
   under that root. `Plugin.cs`, the backends, the audio engine, and config live
   there.
+- The carried planning shell now lives in root docs (`AGENTS.md`, `CLAUDE.md`,
+  `Implementation/`, `icm/`, `wargames/`, and `shell-docs/SUMMARY.md`).
 
 > `RECON NEEDED [R0]` — **Confirm the source root before any edit.**
-> Check: `ls /home/kruillin/Projects/Projects/output/VoiceMaster/VoiceMaster/Plugin.cs`.
+> Check: `ls /home/kruillin/Projects/Projects/VoiceMaster/VoiceMaster/Plugin.cs`.
 > - If present → that is your working tree; all file paths below are relative to
->   `/home/kruillin/Projects/Projects/output/VoiceMaster/`.
+>   `/home/kruillin/Projects/Projects/VoiceMaster/`.
 > - If **absent** → the repo may have been moved to
->   `/home/kruillin/Projects/Projects/VoiceMaster/` (a folder move was pending at
->   plan time). Re-locate with
+>   another path. Re-locate with
 >   `find /home/kruillin/Projects/Projects -name Plugin.cs -path '*VoiceMaster*' -not -path '*/obj/*' 2>/dev/null`
 >   and rebase every path in this plan onto the directory that contains
 >   `VoiceMaster/Plugin.cs`. Do not edit any copy under `Implementation/`.
@@ -57,7 +58,7 @@ even its own git repo (`git rev-parse --show-toplevel` there returns the parent
 - **Canonical build command** (green at plan time — 0 errors, 442 warnings):
   ```bash
   DALAMUD_HOME=~/.xlcore/dalamud/Hooks/dev ~/.dotnet/dotnet build \
-    /home/kruillin/Projects/Projects/output/VoiceMaster/VoiceMaster/VoiceMaster.csproj -c Release
+    /home/kruillin/Projects/Projects/VoiceMaster/VoiceMaster/VoiceMaster.csproj -c Release
   ```
 - **Live plugin config** (do not mutate without the backup move): `~/.xlcore/pluginConfigs/VoiceMaster.json`
   (there is also a stale `NpcVoiceMaster.json` beside it — leave it alone).
