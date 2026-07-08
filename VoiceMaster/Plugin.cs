@@ -229,7 +229,8 @@ public Plugin(
     /// The legacy default was a Windows/Alltalk path (C:\alltalk_tts\LocalSaves) that
     /// never exists on Linux/macOS, silently disabling the cache. When the path is that
     /// legacy value or empty, relocate it under the per-plugin config dir and enable the
-    /// cache (a broken/empty path means it was never functional, so this is a pure gain).
+    /// cache. Some configs carry the same Alltalk folder on another Windows drive letter,
+    /// so treat any drive-rooted Alltalk LocalSaves path as legacy.
     /// </summary>
     private void MigrateAudioCacheLocation()
     {
@@ -237,7 +238,7 @@ public Plugin(
         {
             var loc = Configuration.LocalSaveLocation;
             var isLegacyOrEmpty = string.IsNullOrWhiteSpace(loc)
-                || loc.Equals(@"C:\alltalk_tts\LocalSaves", StringComparison.OrdinalIgnoreCase);
+                || IsLegacyAlltalkLocalSaveLocation(loc);
 
             if (!isLegacyOrEmpty)
                 return;
@@ -258,6 +259,17 @@ public Plugin(
         {
             Log.Error(ex, "Failed to migrate audio cache location");
         }
+    }
+
+    private static bool IsLegacyAlltalkLocalSaveLocation(string loc)
+    {
+        var normalized = loc.Replace('/', '\\');
+
+        return normalized.Length == @"C:\alltalk_tts\LocalSaves".Length
+            && char.IsAsciiLetter(normalized[0])
+            && normalized[1] == ':'
+            && normalized[2] == '\\'
+            && normalized.EndsWith(@"alltalk_tts\LocalSaves", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

@@ -329,7 +329,7 @@ namespace VoiceMaster.Helper.Functional
                 if (result)
                     return;
             }
-            else if (!Directory.Exists(Plugin.Configuration.LocalSaveLocation))
+            else if (Plugin.Configuration.LoadFromLocalFirst && !Directory.Exists(Plugin.Configuration.LocalSaveLocation))
                 LogHelper.Error(MethodBase.GetCurrentMethod().Name, $"Couldn't load file locally. Save location doesn't exists: {Plugin.Configuration.LocalSaveLocation}", voiceMessage.EventId);
 
             RequestingQueue.Add(voiceMessage);
@@ -349,7 +349,7 @@ namespace VoiceMaster.Helper.Functional
                 if (result)
                     return;
             }
-            else if (!Directory.Exists(Plugin.Configuration.LocalSaveLocation))
+            else if (Plugin.Configuration.LoadFromLocalFirst && !Directory.Exists(Plugin.Configuration.LocalSaveLocation))
                 LogHelper.Error(MethodBase.GetCurrentMethod().Name, $"Couldn't load file locally. Save location doesn't exists: {Plugin.Configuration.LocalSaveLocation}", voiceMessage.EventId);
 
             RequestingBubbleQueue.Add(voiceMessage);
